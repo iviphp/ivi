@@ -1,0 +1,42 @@
+{
+  "name": "ivi/ivi.php",
+  "description": "ivi.php — Simple. Modern. Expressive.",
+  "type": "project",
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "Ivi\\Core\\": "core/",
+      "Ivi\\Http\\": "core/Http/",
+      "Ivi\\Config\\": "config/",
+      "Ivi\\Support\\": "support/",
+      "Ivi\\Router\\": "router/",
+      "App\\": "src/"
+    },
+    "files": [
+      "support/helpers.php"
+    ]
+  },
+  "require": {
+    "php": ">=8.1",
+    "vlucas/phpdotenv": "^5.6",
+    "symfony/var-dumper": "^7.0",
+    "firebase/php-jwt": "^6.11",
+    "predis/predis": "^3.0",
+    "ext-json": "*",
+    "cloudinary/cloudinary_php": "^2"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.0",
+    "friendsofphp/php-cs-fixer": "^3.0"
+  },
+  "scripts": {
+    "serve": "php -S 127.0.0.1:8000 -t public",
+    "test": "vendor/bin/phpunit",
+    "lint": "vendor/bin/php-cs-fixer fix --allow-risky=yes"
+  },
+  "config": {
+    "process-timeout": 0
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

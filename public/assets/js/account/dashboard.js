@@ -1,0 +1,2828 @@
+// ==== Bases & helpers (reprend EXACTEMENT ce qu’on a dans le <head>) ====
+const PHP_BASE =
+  window.SA_PHP_BASE ||
+  document.querySelector('meta[name="sa-php-base"]')?.content ||
+  location.origin ||
+  "https://softadastra.com";
+
+const NODE_BASE =
+  window.SA_NODE_BASE ||
+  document.querySelector('meta[name="sa-node-base"]')?.content ||
+  "https://api.softadastra.com";
+
+// helpers d’URL sûrs
+const phpUrl = (p = "") =>
+  PHP_BASE.replace(/\/+$/, "") + "/" + String(p).replace(/^\/+/, "");
+const nodeUrl = (p = "") =>
+  NODE_BASE.replace(/\/+$/, "") + "/" + String(p).replace(/^\/+/, "");
+
+// centralise les endpoints réutilisés
+window.ENDPOINTS = {
+  ...(window.ENDPOINTS || {}),
+  php: {
+    ...(window.ENDPOINTS?.php || {}),
+    getUser:
+      document.querySelector('meta[name="sa-get-user"]')?.content ||
+      "/get-user",
+    ordersMetrics: "/orders/metrics",
+    sellerItems: (uid) => `/api/seller/items/${encodeURIComponent(uid)}`,
+    userReviewsStats: (uid) =>
+      `/api/user/${encodeURIComponent(uid)}/reviews/stats`,
+    userReviews: (uid) => `/api/user/${encodeURIComponent(uid)}/reviews`,
+    updatePhoto: "/user/update-photo",
+    updateCover: "/user/update-cover",
+    getFlash: "/api/get-flash",
+    login: "/login",
+    googleUrl: "/google-login-url",
+    csrf: "/get-csrf-token",
+  },
+  node: {
+    ...(window.ENDPOINTS?.node || {}),
+    likesBatch: (idsCsv) =>
+      `/api/products/likes?ids=${encodeURIComponent(idsCsv)}`,
+  },
+};
+
+const ENDPOINTS_D = window.ENDPOINTS;
+
+function redirectToPage(type, userId) {
+  const url = phpUrl(`/follow-list/${userId}?type=${encodeURIComponent(type)}`);
+  window.location.href = url;
+}
+
+// --- helpers réutilisables (une seule fois dans le fichier) ---
+async function toJSONSafe(res) {
+  const ct = (res.headers.get("content-type") || "").toLowerCase();
+  const txt = await res.text();
+  if (!ct.includes("application/json")) {
+    throw new Error(`Réponse non-JSON (${res.status}) : ${txt.slice(0, 120)}…`);
+  }
+  try {
+    return JSON.parse(txt);
+  } catch {
+    throw new Error("JSON invalide");
+  }
+}
+
+function userEndpointPath() {
+  const ep = window.ENDPOINTS?.php?.getUser;
+  if (typeof ep === "function") return ep();
+  if (typeof ep === "string" && ep.trim()) return ep;
+  // fallback: <meta> ou chemin par défaut
+  const meta = document.querySelector('meta[name="sa-get-user"]')?.content;
+  return meta || "/get-user";
+}
+
+// petites aides DOM tolérantes
+function setText(id, value = "") {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(value ?? "");
+}
+function setDataAttr(id, name, value = "") {
+  const el = document.getElementById(id);
+  if (el) el.dataset[name] = String(value ?? "");
+}
+function setSrc(id, src, fallback = "") {
+  const el = document.getElementById(id);
+  if (el && src) el.src = src;
+  else if (el && fallback) el.src = fallback;
+}
+
+// --- helper URL sellerItems tolérant (fn, string avec :id, string simple)
+function sellerItemsPath(userId) {
+  const ep = window.ENDPOINTS?.php?.sellerItems;
+  if (typeof ep === "function") return ep(userId);
+  if (typeof ep === "string" && ep.includes(":id")) {
+    return ep.replace(":id", encodeURIComponent(userId));
+  }
+  if (typeof ep === "string" && ep.trim()) {
+    // Si on a juste "/api/seller/items" → on ajoute l'id
+    const base = ep.replace(/\/+$/, "");
+    return `${base}/${encodeURIComponent(userId)}`;
+  }
+  // fallback par défaut
+  return `/api/seller/items/${encodeURIComponent(userId)}`;
+}
+
+fetch(phpUrl(ENDPOINTS_D.php.ordersMetrics), {
+  credentials: "include",
+  headers: { Accept: "application/json" },
+})
+  .then((r) => r.json())
+  .then((j) => {
+    if (j?.status === "success") {
+      const buyer = j.data?.count_customers_orders ?? 0;
+      const seller = j.data?.count_seller_orders ?? 0;
+      const total = buyer + seller;
+      const el = document.getElementById("orders-total-count");
+      if (el) el.textContent = String(total);
+    }
+  });
+
+function closeAllDropdownsExcept(currentDropdown) {
+  const dropdowns = document.querySelectorAll(".article-dropdown-menu");
+  dropdowns.forEach((dropdown) => {
+    if (dropdown !== currentDropdown) {
+      dropdown.style.display = "none";
+    }
+  });
+}
+document.addEventListener("click", function (event) {
+  const clickedInsideDropdown =
+    event.target.closest(".three-dots-container") ||
+    event.target.closest(".article-dropdown-menu");
+  if (!clickedInsideDropdown) {
+    closeAllDropdownsExcept(null);
+  }
+});
+
+function attachDropdownEvents() {
+  const dotContainers = document.querySelectorAll(".three-dots-container");
+  dotContainers.forEach((dotContainer) => {
+    dotContainer.addEventListener("click", (event) => {
+      const articleId = dotContainer.id.split("-").pop();
+      const dropdown = document.getElementById(`dropdown-${articleId}`);
+
+      if (!dropdown) return;
+      closeAllDropdownsExcept(dropdown);
+      const shouldShow = dropdown.style.display !== "block";
+      dropdown.style.display = shouldShow ? "block" : "none";
+    });
+  });
+}
+document.addEventListener("DOMContentLoaded", () => {
+  attachDropdownEvents();
+});
+// ------------------------------------------------------------------------------
+
+let idUser = null;
+let currentPage = 1;
+const articlesPerPage = 6;
+let articles = [];
+let totalArticles = 0;
+
+// 🟢 Initialisation complète : données utilisateur + stats + articles
+async function fetchUserAndInit() {
+  try {
+    const path = userEndpointPath(); // ex: "/get-user"
+    const url = phpUrl(path) + "?ts=" + Date.now(); // sécurise la base
+
+    const response = await fetch(url, {
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    if (response.status === 401) {
+      throw new Error("Non authentifié (401)");
+    }
+    if (!response.ok) {
+      throw new Error(
+        `Échec getUser: ${response.status} ${response.statusText}`
+      );
+    }
+
+    // lecture JSON robuste
+    const data = await toJSONSafe(response);
+
+    if (!data?.id) {
+      throw new Error("No user ID found");
+    }
+
+    // ====== STATE
+    idUser = data.id;
+
+    // ====== UI (avec valeurs par défaut/guard)
+    const cover = data.cover_photo
+      ? `/public/images/cover/${data.cover_photo}`
+      : "";
+    setSrc("cover_image_preview", cover, "/public/images/cover/default.jpg");
+    setSrc(
+      "profile_image_preview",
+      data.photo,
+      "/public/images/avatar-default.png"
+    );
+
+    setText("user-fullname", data.fullname || "");
+    setDataAttr("user-fullname", "username", data.username || "");
+    setText("user-bio", data.bio || "");
+    setText("followers-count", data.followers_count ?? 0);
+    setText("following-count", data.following_count ?? 0);
+
+    // Écouteurs followers/following
+    const followersStat = document.getElementById("followers-stat");
+    const followingStat = document.getElementById("following-stat");
+    if (followersStat)
+      followersStat.onclick = () => redirectToPage("followers", idUser);
+    if (followingStat)
+      followingStat.onclick = () => redirectToPage("following", idUser);
+
+    // puis stats produits
+    await fetchProductStats();
+  } catch (error) {
+    console.error("❌ Erreur lors de l'initialisation :", error);
+
+    // Optionnel: feedback UI minimal si tu veux
+    setText("user-fullname", "—");
+    setText("followers-count", "0");
+    setText("following-count", "0");
+    safeFlashError(error.message || "Impossible de charger le profil.");
+  }
+}
+
+function sellerItemsPath(userId) {
+  const ep = window.ENDPOINTS?.php?.sellerItems;
+  if (typeof ep === "function") return ep(userId); // ex: (uid)=>`/api/seller/items/${uid}`
+  if (typeof ep === "string" && ep.trim()) {
+    // Permet un placeholder éventuel dans une string
+    return ep.replace("%UID%", encodeURIComponent(userId));
+  }
+  // fallbacks (meta > défaut)
+  const meta = document.querySelector('meta[name="sa-seller-items"]')?.content;
+  if (meta) return meta.replace("%UID%", encodeURIComponent(userId));
+  return `/api/seller/items/${encodeURIComponent(userId)}`;
+}
+
+// petite aide DOM tolérante
+function setText(id, value = "") {
+  const el = document.getElementById(id);
+  if (el) el.textContent = String(value);
+}
+
+// 🔄 Récupère les statistiques de produits
+async function fetchProductStats() {
+  if (!idUser) {
+    console.error("ID utilisateur manquant");
+    setText("articles-count", "0");
+    return;
+  }
+
+  try {
+    const path = sellerItemsPath(idUser);
+    const url = phpUrl(path); // sécurise la base (https://… + path)
+
+    const response = await fetch(url, {
+      credentials: "include",
+      cache: "no-store",
+    });
+
+    if (response.status === 404) {
+      totalArticles = 0;
+    } else if (!response.ok) {
+      throw new Error(
+        `Erreur produits: ${response.status} ${response.statusText}`
+      );
+    } else {
+      const data = await toJSONSafe(response);
+
+      // data peut être un tableau, ou un objet {data:[…]} / {items:[…]} / {total: n}…
+      if (Array.isArray(data)) {
+        totalArticles = data.length;
+      } else if (Array.isArray(data?.data)) {
+        totalArticles = data.data.length;
+      } else if (Array.isArray(data?.items)) {
+        totalArticles = data.items.length;
+      } else if (Number.isFinite(Number(data?.total))) {
+        totalArticles = Number(data.total);
+      } else if (Number.isFinite(Number(data?.count))) {
+        totalArticles = Number(data.count);
+      } else {
+        // inconnu : au pire 0
+        totalArticles = 0;
+      }
+    }
+
+    setText("articles-count", totalArticles);
+  } catch (error) {
+    console.error("❌ fetchProductStats error:", error);
+    setText("articles-count", "Error");
+  }
+}
+
+// 🏗️ Affiche des skeletons pendant le chargement
+function showSkeletons(count = articlesPerPage) {
+  const container = document.getElementById("articles-container");
+  if (!container) return;
+  container.innerHTML = "";
+
+  for (let i = 0; i < count; i++) {
+    const skeleton = document.createElement("div");
+    skeleton.className = "article-skeleton";
+
+    const title = document.createElement("div");
+    title.className = "skeleton-title";
+
+    const text = document.createElement("div");
+    text.className = "skeleton-text";
+
+    skeleton.appendChild(title);
+    skeleton.appendChild(text);
+    container.appendChild(skeleton);
+  }
+}
+
+// 🔁 Gère le clic sur pagination
+document.addEventListener("click", function (event) {
+  if (
+    event.target.classList.contains("nav-item") &&
+    !event.target.classList.contains("disabled")
+  ) {
+    event.preventDefault();
+    const page = parseInt(event.target.getAttribute("data-page"));
+    currentPage = page;
+    renderArticles();
+    updatePagination();
+  }
+});
+
+// 🚀 Lancement automatique
+document.addEventListener("DOMContentLoaded", () => {
+  fetchUserAndInit();
+});
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+(function () {
+  const $doc = $(document);
+  const $root = $("#sa-flash");
+  if (!$root.length) return; // garde-fou si le popup n'est pas présent
+
+  const $panel = $root.find(".sa-flash__panel");
+  const $overlay = $root.find(".sa-flash__overlay");
+  const $title = $("#sa-flash-title");
+  const $list = $("#sa-flash-messages");
+  const $cta = $("#sa-flash-cta");
+
+  // ---- Contexte & clés de persistance ----
+  const ctx = String($root.data("context") || "default");
+  const DISMISS_KEY = `SA_FLASH_DISMISSED_${ctx}`; // "1" si l'utilisateur a fermé ce popup pendant la session
+  const SEEN_KEY = `SA_FLASH_SEEN_${ctx}`; // set de messages déjà montrés (optionnel)
+
+  function getSeen() {
+    try {
+      return new Set(JSON.parse(sessionStorage.getItem(SEEN_KEY) || "[]"));
+    } catch {
+      return new Set();
+    }
+  }
+  function addSeen(hash) {
+    const s = getSeen();
+    s.add(hash);
+    sessionStorage.setItem(SEEN_KEY, JSON.stringify(Array.from(s)));
+  }
+  function hashMessage(obj) {
+    try {
+      return String(
+        btoa(unescape(encodeURIComponent(JSON.stringify(obj))))
+      ).slice(-50);
+    } catch {
+      return String(Date.now());
+    }
+  }
+
+  // ---- Scroll lock helpers ----
+  function lockScroll() {
+    const sw = window.innerWidth - document.documentElement.clientWidth;
+    if (sw > 0) document.documentElement.style.paddingRight = sw + "px";
+    document.body.dataset.saScrollY = String(window.scrollY || 0);
+    document.body.style.position = "fixed";
+    document.body.style.top = `-${document.body.dataset.saScrollY}px`;
+    document.body.style.left = "0";
+    document.body.style.right = "0";
+  }
+
+  function unlockScroll() {
+    const y = parseInt(document.body.dataset.saScrollY || "0", 10);
+    document.documentElement.style.paddingRight = "";
+    document.body.style.position = "";
+    document.body.style.top = "";
+    document.body.style.left = "";
+    document.body.style.right = "";
+    window.scrollTo(0, y);
+    delete document.body.dataset.saScrollY;
+  }
+
+  // ---- API publique: open/close ----
+  function openFlash({
+    type = "success",
+    title = "Notification",
+    messages = [],
+    ctaText = "OK",
+    ctaLink = null,
+    secondaryText = null,
+    secondaryLink = null,
+    onClose = null,
+  }) {
+    // Ne pas ré-ouvrir si l'utilisateur a déjà fermé pendant cette session
+    if (sessionStorage.getItem(DISMISS_KEY) === "1") return;
+
+    // mark this open as the latest (évite que des opens plus anciens écrasent l'UI)
+    const callId = Date.now();
+    $root.data("lastCallId", callId);
+
+    $root
+      .removeClass("sa-flash--success sa-flash--error sa-flash--info")
+      .addClass(`sa-flash--${type}`);
+
+    $title.text(title);
+    $list.empty();
+
+    if (!Array.isArray(messages)) messages = [String(messages)];
+    messages = messages.filter((m) => m != null && String(m).trim().length);
+
+    if (messages.length) {
+      messages.forEach((msg) => $list.append(`<li>${msg}</li>`));
+      $list.removeAttr("hidden");
+    } else {
+      $list.attr("hidden", "hidden");
+    }
+
+    // --- Primary CTA
+    $cta.text(ctaText);
+    $cta.off("click").on("click", function () {
+      if ($root.data("lastCallId") !== callId) return;
+      if (ctaLink) {
+        closeFlash();
+        window.location.href = ctaLink;
+      } else {
+        closeFlash();
+      }
+    });
+
+    // --- Secondary CTA (optionnelle)
+    const $secondary = $("#sa-flash-secondary");
+    if ($secondary.length) {
+      if (secondaryText) {
+        $secondary.text(secondaryText).show();
+        $secondary.off("click").on("click", function () {
+          if ($root.data("lastCallId") !== callId) return;
+          closeFlash();
+          if (secondaryLink) window.location.href = secondaryLink;
+        });
+      } else {
+        $secondary.hide();
+      }
+    }
+
+    $root.attr("aria-hidden", "false").addClass("is-open");
+    lockScroll();
+
+    $(window)
+      .off("keydown.saFlash")
+      .on("keydown.saFlash", (e) => {
+        if (e.key === "Escape") closeFlash();
+      });
+
+    $root.data("onClose", onClose || null);
+  }
+
+  function closeFlash() {
+    // Marque comme fermé pour la session => n’auto-ouvre plus tant que l’onglet n’est pas fermé
+    sessionStorage.setItem(DISMISS_KEY, "1");
+
+    $root.attr("aria-hidden", "true").removeClass("is-open");
+    $(window).off("keydown.saFlash");
+    unlockScroll();
+
+    const cb = $root.data("onClose");
+    if (typeof cb === "function") {
+      try {
+        cb();
+      } catch {}
+    }
+    $root.removeData("onClose");
+  }
+
+  // Click overlay ou bouton ✕
+  $root.on("click", "[data-sa-close]", closeFlash);
+
+  // --- Expose en global pour l'utiliser hors de l'IIFE
+  window.openFlash = openFlash;
+  window.closeFlash = closeFlash;
+
+  // Optionnel : permettre de ré-activer l’auto-ouverture dans la session
+  window.resetSellerFlashDismiss = function () {
+    sessionStorage.removeItem(DISMISS_KEY);
+  };
+
+  // Expose helpers compatibles avec ton code existant
+  window.showSuccess = function (message) {
+    openFlash({
+      type: "success",
+      title: "Success",
+      messages: [message],
+      ctaText: "OK",
+    });
+  };
+  window.showError = function (errors) {
+    let msgs = [];
+    if (errors && typeof errors === "object") {
+      const vals = Array.isArray(errors) ? errors : Object.values(errors);
+      msgs = vals.flatMap((v) => (Array.isArray(v) ? v : [v])).map(String);
+    } else if (typeof errors === "string") {
+      msgs = [errors];
+    }
+    openFlash({
+      type: "error",
+      title: "Something went wrong",
+      messages: msgs.length ? msgs : ["Unknown error"],
+      ctaText: "Understood",
+    });
+  };
+
+  // ---- Boot: récupérer les flashs (mais seulement si pas déjà fermé) ----
+  $(function () {
+    if (sessionStorage.getItem(DISMISS_KEY) === "1") return;
+
+    $.get(phpUrl(ENDPOINTS_D.php.getFlash), function (response) {
+      const payload = (response && response.messages) || {
+        success: [],
+        error: [],
+      };
+      const seen = getSeen();
+
+      (payload.success || []).forEach((msg) => {
+        const h = hashMessage({ t: "success", msg });
+        if (!seen.has(h)) {
+          showSuccess(msg);
+          addSeen(h);
+        }
+      });
+
+      (payload.error || []).forEach((msg) => {
+        const h = hashMessage({ t: "error", msg });
+        if (!seen.has(h)) {
+          showError(msg);
+          addSeen(h);
+        }
+      });
+    }).fail(() => {
+      /* silencieux */
+    });
+  });
+
+  // ---- BFCache / retour historique : s'assurer qu'il reste fermé si dismissed ----
+  window.addEventListener("pageshow", () => {
+    if (sessionStorage.getItem(DISMISS_KEY) === "1") {
+      $root.attr("aria-hidden", "true").removeClass("is-open");
+      $(window).off("keydown.saFlash");
+      unlockScroll();
+    }
+  });
+})();
+
+// --- Helper anti-casse : utilise openFlash/showError si dispo, sinon alert() ---
+function safeFlashSuccess(
+  msg,
+  {
+    ctaText = "OK",
+    ctaLink = null,
+    secondaryText = null,
+    secondaryLink = null,
+  } = {}
+) {
+  if (typeof window.openFlash === "function") {
+    window.openFlash({
+      type: "success",
+      title: "Success",
+      messages: [msg],
+      ctaText,
+      ctaLink,
+      secondaryText,
+      secondaryLink,
+    });
+  } else if (typeof window.showSuccess === "function") {
+    window.showSuccess(msg);
+  } else {
+    alert(msg);
+  }
+}
+
+function safeFlashError(msg) {
+  if (typeof window.showError === "function") {
+    window.showError(msg);
+  } else if (typeof window.openFlash === "function") {
+    window.openFlash({
+      type: "error",
+      title: "Something went wrong",
+      messages: [msg],
+      ctaText: "Understood",
+    });
+  } else {
+    alert(msg);
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+(() => {
+  // ---- Tabs internes -> renderers (pas d'URL) ----
+  const ROUTES = {
+    listings: renderListings,
+    reviews: renderReviews,
+    favorites: renderFavorites,
+    about: renderAbout,
+    proshop: renderProShop,
+  };
+
+  const DEFAULT_TAB = "listings";
+  const PROFILE_USER_ID = window.SA_PROFILE_USER_ID || null;
+  const API_BASE = window.SA_API_BASE_PHP || ""; // ex: "https://softadastra.com"
+  const NODE_API = NODE_BASE;
+
+  // ==== Refs DOM ====
+  const view = document.getElementById("account-view");
+  const navLinks = Array.from(
+    document.querySelectorAll(".account-bottom-nav__item")
+  );
+  updateFavoritesBadge();
+  updateReviewsBadgeBoot();
+
+  // ==== Helpers ====
+  function setActive(tab) {
+    navLinks.forEach((a) => {
+      const isActive = a.dataset.tab === tab;
+      a.classList.toggle("active", isActive);
+      if (isActive) a.setAttribute("aria-current", "page");
+      else a.removeAttribute("aria-current");
+    });
+  }
+
+  function showSkeleton(count = 6) {
+    view.innerHTML = `<div class="spa-skel">${Array.from({ length: count })
+      .map(() => "<div></div>")
+      .join("")}</div>`;
+  }
+
+  // ==== Navigation ====
+  let navToken = 0;
+
+  async function navigate(tab, { smooth = false, scroll = false } = {}) {
+    const render = ROUTES[tab] || ROUTES[DEFAULT_TAB];
+    const myToken = ++navToken;
+
+    view.dataset.tab = tab;
+    setActive(tab); // <-- IMPORTANT: on met à jour l’état visuel du nav
+
+    showSkeleton(tab === "about" ? 2 : 6);
+
+    await Promise.resolve();
+
+    try {
+      await render({
+        token: myToken,
+      });
+      // ici tu peux gérer scroll si besoin
+      // if (scroll) { ... }
+    } catch (e) {
+      if (myToken !== navToken) return; // navigation déjà changée
+      console.error(e);
+      view.innerHTML = `<div class="about-box">Une erreur est survenue. Réessaie.</div>`;
+    }
+  }
+
+  // Permet aux renderers de vérifier s’ils sont périmés
+  function isStale(token) {
+    return token !== navToken;
+  }
+
+  // ==== Listeners nav ====
+  navLinks.forEach((a) => {
+    a.addEventListener("click", (ev) => {
+      if (ev.ctrlKey || ev.metaKey || ev.shiftKey) return;
+      ev.preventDefault();
+      navigate(a.dataset.tab, {
+        scroll: false,
+        smooth: false,
+      });
+    });
+  });
+
+  function chunkRenderInto(
+    targetEl,
+    htmlArray,
+    { chunk = 12, delay = 16, gridClass = "listings-grid" } = {}
+  ) {
+    // Si on te donne déjà la grille (ex: #grid-listings), on la vide.
+    // Sinon, on en crée une et on l’ajoute à targetEl.
+    let grid = targetEl;
+    if (!grid || !grid.classList || !grid.classList.contains(gridClass)) {
+      grid = document.createElement("div");
+      grid.className = gridClass;
+      targetEl.appendChild(grid);
+    } else {
+      grid.innerHTML = "";
+    }
+
+    // Planificateur cross-browser : rIC avec {timeout}, sinon setTimeout
+    const schedule = (cb) => {
+      if ("requestIdleCallback" in window) {
+        return window.requestIdleCallback(cb, {
+          timeout: delay,
+        });
+      }
+      return setTimeout(cb, delay);
+    };
+
+    let i = 0;
+
+    function tick() {
+      const frag = document.createDocumentFragment();
+      for (let c = 0; c < chunk && i < htmlArray.length; c++, i++) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = htmlArray[i];
+        frag.appendChild(wrap.firstElementChild);
+      }
+      grid.appendChild(frag);
+
+      if (i < htmlArray.length) {
+        schedule(tick);
+      }
+    }
+    tick();
+  }
+
+  /* ====== CONFIG / HELPERS API ====== */
+
+  function pickImage(p) {
+    return (
+      (p.images && p.images[0]) ||
+      p.image_url ||
+      "/public/images/default/adastra.jpg"
+    );
+  }
+
+  function formatPrice(p) {
+    if (p.formatted_price) return p.formatted_price; // "700.00 USD"
+    const price = p.price ?? p.converted_price ?? "";
+    const curr = (p.currency || "").toUpperCase();
+    return [price, curr].filter(Boolean).join(" ").trim();
+  }
+
+  // ----- Prix: USD / UGX / CDF + drapeau -----
+  function formatPriceBlock(a) {
+    // ===== Helpers =====
+    const toNum = (v) => {
+      if (typeof v === "number") return Number.isFinite(v) ? v : 0;
+      if (!v) return 0;
+      const parsed = parseFloat(
+        String(v)
+          .replace(/[^0-9.,-]+/g, "")
+          .replace(",", ".")
+      );
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const getMode = () =>
+      (sessionStorage.getItem("sa_currency_mode") || "STRICT").toUpperCase();
+    const getPref = () =>
+      (sessionStorage.getItem("sa_currency") || "USD").toUpperCase();
+
+    // conversion à partir de l’USD
+    const fxFromUSD = (usd, target) => {
+      if (!usd) return 0;
+      const fx = window.SA_FX && Number(window.SA_FX[target]);
+      if (!fx || fx <= 0 || target === "USD") return usd;
+      return usd * fx;
+    };
+
+    // Formats par devise
+    const formatByCurrency = (value, cur) => {
+      const C = (cur || "USD").toUpperCase();
+      const v = Number(value) || 0;
+      const fmtInt = new Intl.NumberFormat("fr-FR", {
+        useGrouping: true,
+        maximumFractionDigits: 0,
+      });
+
+      const trimZeros = (str) => str.replace(/0+$/g, "");
+
+      if (C === "USD") {
+        let s = v.toFixed(2);
+        let [i, d = ""] = s.split(".");
+        i = fmtInt.format(Number(i));
+        d = trimZeros(d);
+        return d ? `$ ${i},${d}` : `$ ${i}`;
+      }
+
+      if (C === "UGX" || C === "CDF") {
+        return `${fmtInt.format(Math.round(v))} ${C}`;
+      }
+
+      let s = v.toFixed(2);
+      let [i, d = ""] = s.split(".");
+      i = fmtInt.format(Number(i));
+      d = trimZeros(d);
+      return d ? `${i},${d} ${C}` : `${i} ${C}`;
+    };
+
+    // ===== Source USD =====
+    const priceUsd = toNum(a.price) || toNum(a.converted_price) || 0;
+
+    // ===== Mode & préférence =====
+    const mode = getMode();
+    const pref = getPref();
+
+    const displayPrice = mode === "AUTO" ? fxFromUSD(priceUsd, pref) : priceUsd;
+    const priceText = formatByCurrency(displayPrice, pref);
+    const titleFull = priceText; // tooltip cohérent
+
+    return `
+    <div class="sa-card__pricebox">
+      <p class="sa-card__price" title="${titleFull}">${priceText}</p>
+    </div>`;
+  }
+
+  function starsFromAverage(avg) {
+    if (avg == null) return 0;
+    const n = Math.round(Number(avg));
+    return Math.max(0, Math.min(5, n));
+  }
+
+  function badgeFrom(p) {
+    if ((p.condition_name || "").toLowerCase().includes("new")) return "NEW";
+    if (Number(p.boost) > 0) return "BOOST";
+    return "";
+  }
+
+  async function fetchUserProducts(userId, { limit = 5, offset = 0 } = {}) {
+    // Query params propres
+    const qp = new URLSearchParams();
+    if (Number.isFinite(limit) && limit > 0) qp.set("limit", String(limit));
+    if (Number.isFinite(offset) && offset > 0) qp.set("offset", String(offset));
+
+    // URL sûre via ENDPOINTS + phpUrl()
+    const path = sellerItemsPath(userId); // ex: "/api/seller/items/123"
+    const url = phpUrl(path) + (qp.toString() ? `?${qp}` : "");
+
+    // Requête avec cookies
+    const res = await fetch(url, { credentials: "include", cache: "no-store" });
+
+    // 404 = pas d’articles pour ce vendeur
+    if (res.status === 404) return [];
+
+    if (!res.ok) {
+      // lève une erreur claire (sera catchée en amont si besoin)
+      throw new Error(`GET ${url} → ${res.status} ${res.statusText}`);
+    }
+
+    // Lecture JSON robuste (évite les "JSON.parse unexpected character…")
+    const arr = await toJSONSafe(res);
+
+    // Normalisation des objets produits
+    const normalized = (Array.isArray(arr) ? arr : []).map((p) => {
+      const pid = normId(p.id ?? p.product_id);
+      const avg = Number(p.average_rating);
+      const stars = Number.isFinite(avg)
+        ? Math.round(avg)
+        : Math.round(Number(p.average_rating ?? 0));
+
+      return {
+        id: pid,
+        title: p.title,
+        image: pickImage(p),
+        price: p.price,
+        original_price: p.original_price,
+        formatted_price: p.formatted_price,
+        currency: p.currency,
+        converted_price: p.converted_price,
+        avg: Number.isFinite(avg) ? Math.max(0, Math.min(5, avg)) : null,
+        stars: Math.max(0, Math.min(5, stars)),
+        sold: p.review_count || 0,
+        city: p.city_name || "",
+        shop: p.seller_fullname || "Softadastra",
+        badge: (p.condition_name || "").toLowerCase().includes("new")
+          ? "NEW"
+          : Number(p.boost) > 0
+          ? "BOOST"
+          : "",
+        status: (p.status || "").toLowerCase(),
+        boost: Number(p.boost) || 0,
+        views: Number(p.views) || 0,
+        quantity: Number(p.quantity) || 0,
+        sizes: Array.isArray(p.sizes) ? p.sizes : [],
+        colors: Array.isArray(p.colors) ? p.colors : [],
+        brand_name: p.brand_name || "",
+        condition_name: p.condition_name || "",
+        category_name: p.category_name || "",
+      };
+    });
+
+    return normalized;
+  }
+
+  function renderStarsFromAvg(avg = 0) {
+    const a = Math.max(0, Math.min(5, Number(avg) || 0));
+    const full = Math.floor(a);
+    const hasHalf = a - full >= 0.25 && a - full < 0.75; // demi entre 0.25 et 0.74
+    const rest = 5 - full - (hasHalf ? 1 : 0);
+
+    const svg = (cls) => `
+    <svg class="star ${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.62L12 2 9.19 8.62 2 9.24l5.46 4.73L5.82 21z"></path>
+    </svg>`;
+
+    return `<span class="stars" aria-label="${a.toFixed(1)}/5">
+    ${Array.from({ length: full })
+      .map(() => svg("star--on"))
+      .join("")}
+    ${hasHalf ? svg("star--half") : ""}
+    ${Array.from({ length: rest })
+      .map(() => svg("star--off"))
+      .join("")}
+  </span>`;
+  }
+
+  /* ================================== */
+  /* ===== REPLACE ENTIRE renderListings() ===== */
+  async function renderListings() {
+    // ---- Shell UI
+    view.innerHTML = `
+    <section>
+      <h3 style="margin:6px 0 10px;">Products</h3>
+      <div id="grid-listings" class="listings-grid"></div>
+      <div id="first-cta" style="text-align:center;margin:12px 0;">
+       <a id="see-more" class="sa-btn sa-btn--primary see-more-btn" href="#" role="button">See more</a>
+      </div>
+      <div id="loader" style="text-align:center;padding:12px;display:none;">Loading…</div>
+    </section>
+  `;
+
+    const grid = view.querySelector("#grid-listings");
+    const loader = view.querySelector("#loader");
+    const ctaBox = view.querySelector("#first-cta");
+    const ctaBtn = view.querySelector("#see-more");
+
+    // ---- Config pagination
+    const LIMIT_FIRST = 5; // first render
+    const LIMIT_NEXT = 10; // next batches
+    let nextOffset = 0;
+
+    // ---- State
+    let startedScroll = false;
+    let isLoading = false;
+    let hasMore = true;
+    const seen = new Set();
+    let fallbackAll = null; // server returns full list
+    let serverIgnoresLimit = false;
+
+    // Empty state (no products)
+    function emptyStateHTML() {
+      return `
+      <div class="listings-empty" role="status" aria-live="polite"
+           style="text-align:center;padding:24px 8px;border:1px dashed #e7e9ee;border-radius:12px;">
+        <svg viewBox="0 0 24 24" width="56" height="56" aria-hidden="true"
+             style="display:block;margin:0 auto 10px;color:#9aa1ac;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;">
+          <!-- Box / package -->
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          <path d="M3.3 7.3 12 12l8.7-4.7M12 22V12"></path>
+        </svg>
+        <div style="font-weight:700;color:#0b0c0f;margin-bottom:4px;">No products yet</div>
+        <div style="color:#667085;font-size:.95rem;">This seller hasn’t published any products yet.</div>
+      </div>
+    `;
+    }
+
+    // Util: append list of HTML strings to grid
+    function appendCardsHTML(htmlList) {
+      const frag = document.createDocumentFragment();
+      for (const html of htmlList) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = html;
+        if (wrap.firstElementChild) frag.appendChild(wrap.firstElementChild);
+      }
+      grid.appendChild(frag);
+    }
+
+    // Card factory
+    function cardHTML(it) {
+      const nextStatus = it.status === "active" ? "inactive" : "active";
+      const priceBlock = formatPriceBlock(it);
+      return `
+<article class="card" data-id="${
+        it.id
+      }" style="content-visibility:auto;contain-intrinsic-size:300px 400px;">
+  <a href="/item/${
+    it.id
+  }" class="card-link" style="text-decoration:none;color:inherit;">
+    <div class="media">
+      <img loading="lazy" decoding="async"
+           src="${it.image}"
+           srcset="${it.image}?w=300 300w, ${it.image}?w=600 600w, ${
+        it.image
+      }?w=900 900w"
+           sizes="(max-width:380px) 92vw, (max-width:600px) 45vw, (max-width:1024px) 30vw, 220px"
+           alt="${it.title}">
+      ${it.badge ? `<span class="badge">${it.badge}</span>` : ""}
+      <button class="dots-btn" type="button" aria-haspopup="true" data-menu-id="menu-${
+        it.id
+      }">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"
+             style="stroke:currentColor;fill:none;stroke-width:2;">
+          <circle cx="12" cy="5" r="1.5"></circle>
+          <circle cx="12" cy="12" r="1.5"></circle>
+          <circle cx="12" cy="19" r="1.5"></circle>
+        </svg>
+      </button>
+      <div class="dropdown-menu" id="menu-${
+        it.id
+      }" role="menu" aria-hidden="true">
+        <a class="dropdown-item" href="/article/${it.id}">View</a>
+        <button class="dropdown-item js-publish" data-id="${
+          it.id
+        }" data-next="${nextStatus}">
+          ${it.status === "inactive" ? "Publish" : "Unpublish"}
+        </button>
+        <button class="dropdown-item js-delete" data-id="${
+          it.id
+        }">Delete</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <h4 class="title clamp-2" title="${it.title}">${it.title}</h4>
+      <div class="price-block">${priceBlock}</div>
+      <div class="rating" title="${it.sold} reviews, rating ${(Number.isFinite(
+        it.avg
+      )
+        ? it.avg
+        : 0
+      ).toFixed(1)}/5">
+        ${renderStarsFromAvg(Number.isFinite(it.avg) ? it.avg : it.stars)}
+        <span class="note">${
+          Number.isFinite(it.avg)
+            ? it.avg.toFixed(1)
+            : (it.stars || 0).toFixed(1)
+        }</span>
+        <span class="count">(${it.sold})</span>
+      </div>
+      <div class="chips">
+        <span class="chip" title="Quantity">Qty: ${it.quantity}</span>
+        <span class="chip" title="Views">👁 ${it.views}</span>
+        ${it.city ? `<span class="chip" title="City">${it.city}</span>` : ``}
+        ${
+          it.status === "inactive"
+            ? `<span class="chip chip--warn">Unpublish</span>`
+            : ``
+        }
+      </div>
+    </div>
+  </a>
+</article>`;
+    }
+
+    // Take up to `limit` unseen items
+    function takeUnseenMax(items, limit) {
+      const out = [];
+      for (const it of items) {
+        if (!it || seen.has(it.id)) continue;
+        seen.add(it.id);
+        out.push(it);
+        if (out.length >= limit) break;
+      }
+      return out;
+    }
+
+    // Load a batch (server or fallback)
+    async function loadBatch({ limit, offset }) {
+      if (serverIgnoresLimit && Array.isArray(fallbackAll)) {
+        const slice = takeUnseenMax(fallbackAll.slice(offset), limit);
+        if (
+          offset + slice.length >= fallbackAll.length ||
+          slice.length < limit
+        ) {
+          hasMore = false;
+        }
+        return slice;
+      }
+
+      const serverItems = await fetchUserProducts(PROFILE_USER_ID, {
+        limit,
+        offset,
+      });
+
+      // First call: detect if server ignores limit
+      if (offset === 0 && serverItems && serverItems.length > limit) {
+        serverIgnoresLimit = true;
+        fallbackAll = serverItems;
+        const slice = takeUnseenMax(fallbackAll, limit);
+        if (fallbackAll.length <= limit) hasMore = false;
+        return slice;
+      }
+
+      const freshClamped = takeUnseenMax(serverItems || [], limit);
+
+      if (
+        !serverItems ||
+        serverItems.length < limit ||
+        freshClamped.length < limit
+      ) {
+        hasMore = false;
+      }
+      return freshClamped;
+    }
+
+    // Helper: show empty state OUTSIDE the grid
+    function showEmptyStateProfilePivate({
+      title = "Add items to start selling",
+      text = "List your items easily by adding them to one of these trending categories:",
+      categories = ["Blazer & trouser sets", "Sneakers"],
+      addUrl = "/seller/items/new",
+      onAddClick = null,
+    } = {}) {
+      // 1) Hide the grid so layout stays clean
+      grid.style.display = "none";
+
+      // 2) Avoid duplicate empty state
+      const markerClass = "listings-empty-vinted";
+      if (grid.nextElementSibling?.classList?.contains(markerClass)) return;
+
+      // 3) Build chips
+      const chips = categories
+        .map(
+          (c) => `
+          <button type="button" class="le-chip" data-cat="${c}">
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="le-chip__icon">
+              <!-- Tag icon -->
+              <path d="M20.59 13.41 12 4.83A2 2 0 0 0 10.59 4H6a2 2 0 0 0-2 2v4.59A2 2 0 0 0 4.83 12l8.58 8.59a2 2 0 0 0 2.83 0l4.35-4.35a2 2 0 0 0 0-2.83zM7.5 7.5h.01" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+          <span>${c}</span>
+          </button>`
+        )
+        .join("");
+
+      // 4) HTML
+      const wrap = document.createElement("div");
+      wrap.className = `${markerClass}`;
+      wrap.setAttribute("role", "status");
+      wrap.setAttribute("aria-live", "polite");
+      wrap.innerHTML = `
+          <section class="le-wrap">
+          <!-- Main empty callout -->
+          <div class="le-card">
+              <div class="le-card__icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <!-- Box -->
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16zM12 12v10M3.3 7.3 12 12l8.7-4.7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+              </div>
+              <h3 class="le-card__title">${title}</h3>
+              <p class="le-card__text">${text}</p>
+              <div class="le-chips" role="list">${chips}</div>
+              <div class="le-cta">
+              <a href="${addUrl}" class="le-btn" id="le-add-items">
+                  <svg viewBox="0 0 24 24" aria-hidden="true" class="le-btn__icon">
+                  <!-- Plus -->
+                  <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+                  </svg>
+                  <span>Add items</span>
+              </a>
+              </div>
+          </div>
+          </section>`;
+
+      // 5) Inject right after grid & hide any upstream CTA
+      grid.insertAdjacentElement("afterend", wrap);
+      ctaBox.style.display = "none";
+
+      // 6) Optional: intercept CTA click
+      const addBtn = wrap.querySelector("#le-add-items");
+      if (onAddClick && typeof onAddClick === "function") {
+        addBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          onAddClick(addUrl);
+        });
+      }
+    }
+
+    // Helper: show error outside the grid
+    function showErrorState() {
+      grid.style.display = "none";
+      const err = document.createElement("div");
+      err.className = "listings-empty";
+      err.setAttribute("role", "alert");
+      err.style.textAlign = "center";
+      err.style.padding = "24px 8px";
+      err.style.border = "1px dashed #e7e9ee";
+      err.style.borderRadius = "12px";
+      err.innerHTML = `
+                    <svg viewBox="0 0 24 24" width="56" height="56" aria-hidden="true"
+                        style="display:block;margin:0 auto 10px;color:#9aa1ac;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;">
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <path d="M12 9v4"></path>
+                    <path d="M12 17h.01"></path>
+                    </svg>
+                    <div style="font-weight:700;color:#0b0c0f;margin-bottom:4px;">Unable to load products</div>
+                    <div style="color:#667085;font-size:.95rem;">Please try again later.</div>`;
+      if (
+        !(
+          grid.nextElementSibling &&
+          grid.nextElementSibling.classList?.contains("listings-empty")
+        )
+      ) {
+        grid.insertAdjacentElement("afterend", err);
+      }
+      ctaBox.style.display = "none";
+    }
+
+    // Append a batch to DOM
+    async function loadMore(limit, offset) {
+      if (isLoading || !hasMore) return;
+      isLoading = true;
+      loader.style.display = "block";
+
+      try {
+        const batch = await loadBatch({
+          limit,
+          offset,
+        });
+
+        // If nothing at all and grid is still empty -> show empty state OUTSIDE
+        if ((!batch || !batch.length) && grid.children.length === 0) {
+          showEmptyStateProfilePivate({
+            // Optional overrides:
+            // title: "Start selling today",
+            // text:  "Add your first items in these trending categories:",
+            // categories: ["Womenswear", "Menswear", "Tech", "Sneakers"],
+            // addUrl: "/sell/new",
+            // onAddClick: (url) => { openModalOrRoute(url); }
+          });
+          hasMore = false;
+          return;
+        }
+
+        // No more results (but some already rendered) -> stop
+        if (!batch.length) {
+          hasMore = false;
+          return;
+        }
+
+        // Ensure grid is visible when we have content
+        if (grid.style.display === "none") {
+          grid.style.display = ""; // revert hidden grid in case it was empty before
+          // remove previous empty block if present
+          if (
+            grid.nextElementSibling &&
+            grid.nextElementSibling.classList?.contains("listings-empty")
+          ) {
+            grid.nextElementSibling.remove();
+          }
+        }
+
+        appendCardsHTML(batch.map(cardHTML));
+        nextOffset = offset + batch.length;
+      } catch (e) {
+        console.error("loadMore error:", e);
+        if (grid.children.length === 0) {
+          showErrorState(); // inject error outside the grid
+        }
+        hasMore = false;
+      } finally {
+        isLoading = false;
+        loader.style.display = "none";
+      }
+    }
+
+    // Infinite scroll (after "See more")
+    let observer = null;
+
+    function startInfiniteScroll() {
+      if (startedScroll) return;
+      startedScroll = true;
+
+      const sentinel = document.createElement("div");
+      sentinel.id = "scroll-sentinel";
+      grid.after(sentinel);
+
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            loadMore(LIMIT_NEXT, nextOffset);
+          }
+        },
+        {
+          rootMargin: "300px",
+        }
+      );
+
+      observer.observe(sentinel);
+    }
+
+    // ---- 1) First render: exactly 5 items (or empty state)
+    await loadMore(LIMIT_FIRST, 0);
+
+    // Show button only if there is more
+    ctaBox.style.display = hasMore ? "block" : "none";
+
+    // ---- 2) Click "See more" → load one batch then start infinite scroll
+    ctaBtn?.addEventListener("click", async () => {
+      ctaBox.style.display = "none";
+      await loadMore(LIMIT_NEXT, nextOffset);
+      if (hasMore) startInfiniteScroll();
+    });
+
+    // ---- Dots menus (singleton)
+    requestAnimationFrame(() => initThreeDotsMenus());
+  }
+
+  // === Spinner global plein écran =========================================
+  (function setupGlobalSpinner() {
+    if (window.__ADAS_SPINNER_SETUP__) return;
+    window.__ADAS_SPINNER_SETUP__ = true;
+
+    // CSS (injecté une fois)
+    const css = `
+            #adastra-spinner{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:100000;background:rgba(255,255,255,.65);backdrop-filter:saturate(1.1) blur(1.5px)}
+            #adastra-spinner.is-open{display:flex}
+            #adastra-spinner .box{display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px 22px;border-radius:16px;background:#fff;box-shadow:0 20px 60px rgba(0,0,0,.15)}
+            #adastra-spinner .loader{width:56px;height:56px;border-radius:50%;border:4px solid #ff9900;border-top-color:transparent;animation:adastra-spin .8s linear infinite}
+            #adastra-spinner .label{font:600 14px/1.2 system-ui,Segoe UI,Roboto,Arial;color:#212121}
+            @keyframes adastra-spin{to{transform:rotate(360deg)}}`;
+    const st = document.createElement("style");
+    st.textContent = css;
+    document.head.appendChild(st);
+
+    // DOM overlay
+    const wrap = document.createElement("div");
+    wrap.id = "adastra-spinner";
+    wrap.setAttribute("aria-hidden", "true");
+    wrap.innerHTML = `
+            <div class="box" role="status" aria-live="polite" aria-label="Loading">
+            <div class="loader" aria-hidden="true"></div>
+            <div class="label" id="adastra-spinner-label">Updating…</div>
+            </div>`;
+    document.body.appendChild(wrap);
+
+    // helpers
+    window.showGlobalSpinner = function (label = "Updating…") {
+      const w = document.getElementById("adastra-spinner");
+      const l = document.getElementById("adastra-spinner-label");
+      if (l) l.textContent = label;
+      w?.classList.add("is-open");
+      w?.setAttribute("aria-hidden", "false");
+    };
+    window.hideGlobalSpinner = function () {
+      const w = document.getElementById("adastra-spinner");
+      w?.classList.remove("is-open");
+      w?.setAttribute("aria-hidden", "true");
+    };
+  })();
+
+  // --- Ferme tous les menus ouverts
+  function closeAllMenus() {
+    document
+      .querySelectorAll('.dropdown-menu[aria-hidden="false"]')
+      .forEach((m) => {
+        m.setAttribute("aria-hidden", "true");
+        // 🔄 reset des styles inline pour repartir propre au prochain open
+        m.style.left = "";
+        m.style.right = "";
+        m.style.top = "";
+        m.style.bottom = "";
+      });
+    document
+      .querySelectorAll('.dots-btn[aria-expanded="true"]')
+      .forEach((b) => {
+        b.setAttribute("aria-expanded", "false");
+      });
+  }
+
+  // --- Singleton d'initialisation (évite les doublons au re-render)
+  function initThreeDotsMenus() {
+    if (window.__ADAS_THREEDOTS_INIT__) return; // déjà fait
+    window.__ADAS_THREEDOTS_INIT__ = true;
+
+    // 1) Toggle sur chaque bouton 3 points (on écoute via délégation)
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest(".dots-btn");
+      if (!btn) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const menuId = btn.dataset.menuId;
+      const menu = document.getElementById(menuId);
+      if (!menu) return;
+
+      const isOpen = menu.getAttribute("aria-hidden") === "false";
+      closeAllMenus();
+      if (!isOpen) {
+        menu.setAttribute("aria-hidden", "false");
+        btn.setAttribute("aria-expanded", "true");
+
+        // 🔧 Positionnement anti-débordement (après ouverture)
+        requestAnimationFrame(() => {
+          // valeurs par défaut
+          menu.style.left = "auto";
+          menu.style.right = "8px";
+          menu.style.top = "46px";
+          menu.style.bottom = "auto";
+
+          const rect = btn.getBoundingClientRect();
+          const menuRect = menu.getBoundingClientRect();
+          const vw = Math.max(
+            document.documentElement.clientWidth || 0,
+            window.innerWidth || 0
+          );
+          const vh = Math.max(
+            document.documentElement.clientHeight || 0,
+            window.innerHeight || 0
+          );
+
+          // ➜ si ça dépasse à droite, on aligne à gauche
+          if (rect.right + menuRect.width > vw - 8) {
+            menu.style.right = "auto";
+            menu.style.left = "8px";
+          } else {
+            menu.style.left = "auto";
+            menu.style.right = "8px";
+          }
+
+          // ➜ si ça dépasse en bas, on ouvre vers le haut
+          const spaceBelow = vh - rect.bottom;
+          if (spaceBelow < menuRect.height + 12) {
+            menu.style.top = "auto";
+            menu.style.bottom = "46px";
+          } else {
+            menu.style.bottom = "auto";
+            menu.style.top = "46px";
+          }
+        });
+      }
+    });
+
+    // 2) Clic extérieur : ferme (listener PERSISTANT, pas {once:true})
+    document.addEventListener("click", (e) => {
+      // Si on clique DANS un menu, on ne ferme pas
+      if (e.target.closest(".dropdown-menu") || e.target.closest(".dots-btn"))
+        return;
+      closeAllMenus();
+    });
+
+    // 3) Échap : ferme
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeAllMenus();
+    });
+
+    // 4) Actions du menu (Publish/Unpublish/Delete) via délégation
+    document.addEventListener("click", async (e) => {
+      const item = e.target.closest(".dropdown-item");
+      if (!item) return;
+
+      // On ne laisse pas l'anchor parent <a class="card-link"> naviguer
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (item.classList.contains("js-publish")) {
+        const id = item.dataset.id;
+        const next = item.dataset.next; // "active" | "inactive"
+
+        // Texte contextualisé
+        const isUnpublish = next === "inactive";
+        const title = isUnpublish ? "Confirm unpublish" : "Confirm publish";
+        const message = isUnpublish
+          ? "Are you sure you want to unpublish this item? It will be hidden from buyers."
+          : "Publish this item now and make it visible to buyers?";
+        const confirmText = isUnpublish ? "Unpublish" : "Publish";
+
+        openConfirmPopup({
+          title,
+          message,
+          confirmText,
+          cancelText: "Cancel",
+          onConfirm: async () => {
+            // anti double-clic
+            if (item.dataset.loading === "1") return;
+            item.dataset.loading = "1";
+
+            let resp;
+            try {
+              showGlobalSpinner(isUnpublish ? "Unpublishing…" : "Publishing…");
+
+              resp = await togglePublish(id, next);
+
+              applyStatusUI(id, next, resp);
+              closeAllMenus();
+            } catch (err) {
+              console.error(err);
+              hideGlobalSpinner();
+              item.dataset.loading = "0";
+              safeFlashError(
+                err.message || "Action impossible pour le moment."
+              );
+              return;
+            }
+
+            hideGlobalSpinner();
+            item.dataset.loading = "0";
+            safeFlashSuccess(resp?.message || "Status updated.");
+          },
+        });
+
+        return;
+      }
+
+      // Delete
+      if (item.classList.contains("js-delete")) {
+        const id = item.dataset.id;
+        openDeletePopup({
+          onConfirm: async () => {
+            // anti double-clic
+            if (item.dataset.loading === "1") return;
+            item.dataset.loading = "1";
+
+            let resp;
+            try {
+              showGlobalSpinner("Deleting…");
+              resp = await deleteArticle(id);
+              // supprime la carte du DOM
+              const card = document.querySelector(`.card[data-id="${id}"]`);
+              if (card) card.remove();
+              closeAllMenus();
+            } catch (err) {
+              console.error(err);
+              hideGlobalSpinner();
+              item.dataset.loading = "0";
+              safeFlashError(
+                err.message || "Suppression impossible pour le moment."
+              );
+              return;
+            }
+
+            hideGlobalSpinner();
+            item.dataset.loading = "0";
+            safeFlashSuccess(
+              resp?.message || "Your article has been successfully deleted."
+            );
+          },
+        });
+
+        return;
+      }
+    });
+  }
+
+  // --- Mise à jour UI locale après publish/unpublish
+  function applyStatusUI(productId, nextStatus, resp) {
+    const card = document.querySelector(`.card[data-id="${productId}"]`);
+    if (!card) return;
+
+    // Si le backend te renvoie le status réel, priorise-le
+    const effective =
+      resp && resp.status ? String(resp.status) : String(nextStatus);
+
+    // Libellé & next
+    const btn = card.querySelector(".dropdown-item.js-publish");
+    if (btn) {
+      btn.textContent = effective === "inactive" ? "Publish" : "Unpublish";
+      btn.dataset.next = effective === "inactive" ? "active" : "inactive";
+    }
+
+    // Pastille "Unpublish"
+    const tag = card.querySelector(".tag-depublish");
+    if (effective === "inactive") {
+      if (!tag) {
+        const el = document.createElement("div");
+        el.className = "tag-depublish";
+        el.textContent = "Unpublish";
+        card.querySelector(".card-body")?.appendChild(el);
+      }
+    } else {
+      tag && tag.remove();
+    }
+  }
+
+  let __csrfRefreshedAt = 0;
+  const CSRF_TTL_MS = 8 * 60 * 1000; // 8 min
+
+  function readCsrfToken() {
+    return (
+      document.querySelector('input[name="csrf_token"]')?.value ||
+      document.querySelector('meta[name="csrf-token"]')?.content ||
+      ""
+    );
+  }
+
+  function setCsrfTokenInDom(token) {
+    let input = document.querySelector('input[name="csrf_token"]');
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "csrf_token";
+      document.body.appendChild(input);
+    }
+    input.value = token;
+
+    let meta = document.querySelector('meta[name="csrf-token"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.setAttribute("name", "csrf-token");
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute("content", token);
+  }
+
+  async function refreshCsrfToken() {
+    const res = await fetch("/get-csrf-token", {
+      method: "GET",
+      credentials: "include", // ⬅️ IMPORTANT si origines ≠
+      headers: {
+        Accept: "text/plain",
+      },
+    });
+    if (!res.ok) throw new Error("Cannot refresh CSRF token");
+    const token = await res.text();
+    setCsrfTokenInDom(token);
+    __csrfRefreshedAt = Date.now();
+    return token;
+  }
+
+  async function ensureFreshCsrf() {
+    const token = readCsrfToken();
+    const freshEnough = token && Date.now() - __csrfRefreshedAt < CSRF_TTL_MS;
+    if (!freshEnough) await refreshCsrfToken();
+  }
+
+  window.addEventListener("load", () => {
+    ensureFreshCsrf().catch(() => {});
+  });
+
+  async function csrfFetch(url, options = {}, injectBodyField = true) {
+    await ensureFreshCsrf();
+
+    const opts = {
+      ...options,
+    };
+    const csrf = readCsrfToken();
+
+    // ⬇️ pour cross-origin (ou par sécurité)
+    opts.credentials = "include";
+
+    opts.headers = {
+      Accept: "application/json",
+      ...(opts.headers || {}),
+      "X-CSRF-Token": csrf,
+    };
+
+    if (injectBodyField && opts.body instanceof URLSearchParams) {
+      if (!opts.body.has("csrf_token")) opts.body.set("csrf_token", csrf);
+    }
+
+    return fetch(url, opts);
+  }
+
+  async function togglePublish(productId, nextStatus) {
+    const url = `${API_BASE}/api/item/status`;
+    const body = new URLSearchParams();
+    body.set("productId", String(productId));
+    body.set("status", String(nextStatus));
+
+    const res = await csrfFetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body,
+    });
+
+    let data = {};
+    try {
+      data = await res.json();
+    } catch {}
+
+    if (!res.ok || data?.success === false) {
+      throw new Error(
+        data?.error || data?.message || `Publish toggle failed ${res.status}`
+      );
+    }
+    return data;
+  }
+
+  let __DELETE_POPUP_OPEN = false;
+
+  function openDeletePopup({ onConfirm }) {
+    if (__DELETE_POPUP_OPEN) return;
+    __DELETE_POPUP_OPEN = true;
+
+    const popup = document.getElementById("sa-delete-popup");
+    if (!popup) {
+      __DELETE_POPUP_OPEN = false;
+      return;
+    }
+
+    const cancelBtn = document.getElementById("sa-delete-cancel");
+    const confirmBtn = document.getElementById("sa-delete-confirm");
+
+    const closePopup = () => {
+      popup.classList.remove("is-open");
+      popup.setAttribute("aria-hidden", "true");
+      cancelBtn.removeEventListener("click", cancelHandler);
+      confirmBtn.removeEventListener("click", confirmHandler);
+      __DELETE_POPUP_OPEN = false;
+    };
+
+    const cancelHandler = () => closePopup();
+    const confirmHandler = () => {
+      closePopup();
+      onConfirm?.();
+    };
+
+    popup.classList.add("is-open");
+    popup.setAttribute("aria-hidden", "false");
+    cancelBtn.addEventListener("click", cancelHandler);
+    confirmBtn.addEventListener("click", confirmHandler);
+    popup
+      .querySelector("[data-sa-close]")
+      ?.addEventListener("click", closePopup, {
+        once: true,
+      });
+  }
+
+  let __CONFIRM_POPUP_OPEN = false;
+
+  function openConfirmPopup({
+    title = "Confirm",
+    message = "Are you sure?",
+    confirmText = "Confirm",
+    cancelText = "Cancel",
+    onConfirm = null,
+    onCancel = null,
+  } = {}) {
+    if (__CONFIRM_POPUP_OPEN) return;
+    const el = document.getElementById("sa-confirm-popup");
+    if (!el) return;
+
+    const t = document.getElementById("sa-confirm-title");
+    const m = document.getElementById("sa-confirm-text");
+    const cancelBtn = document.getElementById("sa-confirm-cancel");
+    const okBtn = document.getElementById("sa-confirm-ok");
+
+    t.textContent = title;
+    m.textContent = message;
+    cancelBtn.textContent = cancelText;
+    okBtn.textContent = confirmText;
+
+    const close = (cb) => {
+      el.classList.remove("is-open");
+      el.setAttribute("inert", "");
+      __CONFIRM_POPUP_OPEN = false;
+      cancelBtn.removeEventListener("click", onCancelClick);
+      okBtn.removeEventListener("click", onOkClick);
+      overlay?.removeEventListener("click", onOverlay);
+      if (cb) cb();
+    };
+
+    const onCancelClick = () => close(onCancel);
+    const onOkClick = () => close(onConfirm);
+    const overlay = el.querySelector("[data-sa-close]");
+    const onOverlay = () => close(onCancel);
+
+    cancelBtn.addEventListener("click", onCancelClick);
+    okBtn.addEventListener("click", onOkClick);
+    overlay?.addEventListener("click", onOverlay);
+
+    __CONFIRM_POPUP_OPEN = true;
+    el.classList.add("is-open");
+    el.setAttribute("aria-hidden", "false");
+  }
+
+  async function deleteArticle(productId) {
+    const url = `${API_BASE}/api/item/${encodeURIComponent(productId)}/delete`;
+
+    // Backend lit $_POST['articleId'] → on envoie en x-www-form-urlencoded
+    const body = new URLSearchParams();
+    body.set("articleId", String(productId));
+
+    const res = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body,
+    });
+
+    // On essaie de parser la réponse (même en cas d'erreur)
+    let data = {};
+    try {
+      data = await res.json();
+    } catch {}
+
+    if (res.status === 401) {
+      throw new Error(data.message || "User not logged in.");
+    }
+    if (res.status === 403) {
+      throw new Error(
+        data.message || "You are not authorized to delete this article."
+      );
+    }
+    if (!res.ok) {
+      throw new Error(data.message || `Delete failed ${res.status}`);
+    }
+
+    // attendu: { message: 'Your article has been successfully deleted.' }
+    return data;
+  }
+
+  // ---------- Helpers ----------
+  function normId(x) {
+    const n = Number(x);
+    return Number.isFinite(n) ? n : Number.parseInt(String(x).trim(), 10);
+  }
+
+  // Pluralisation FR
+  const FR_PL = new Intl.PluralRules("fr");
+  const isOne = (n) => FR_PL.select(Number(n)) === "one";
+  const motFavori = (n) => (isOne(n) ? "favori" : "favoris");
+  const pronomIls = (n) => (isOne(n) ? "il" : "ils");
+  const verbeEtre = (n) => (isOne(n) ? "n’est pas" : "ne sont pas");
+  const appartiennent = (n) => (isOne(n) ? "n’appartient" : "n’appartiennent");
+  const dispoMot = (n) => (isOne(n) ? "disponible" : "disponibles");
+
+  // Normalise product_ids depuis /api/me/likes (string CSV, string JSON, array, array d'objets)
+  function normalizeLikedIds(product_ids) {
+    if (!product_ids) return [];
+    // String JSON: '["210","211"]'
+    if (typeof product_ids === "string" && /^\s*\[/.test(product_ids)) {
+      try {
+        const arr = JSON.parse(product_ids);
+        return Array.isArray(arr)
+          ? arr.map(normId).filter(Number.isFinite)
+          : [];
+      } catch {
+        // si parse échoue, on retombe plus bas
+      }
+    }
+    // String CSV: "210,211"
+    if (typeof product_ids === "string") {
+      return product_ids.split(",").map(normId).filter(Number.isFinite);
+    }
+    // Array d'objets: [{product_id:210}, {id:"211"}]
+    if (Array.isArray(product_ids) && typeof product_ids[0] === "object") {
+      return product_ids
+        .map((o) => normId(o.product_id ?? o.id))
+        .filter(Number.isFinite);
+    }
+    // Array simple: [210,"211"]
+    if (Array.isArray(product_ids)) {
+      return product_ids.map(normId).filter(Number.isFinite);
+    }
+    return [];
+  }
+
+  // Mappe le "product" (structure /api/show/:id) vers un card
+  function mapShowProductToCard(product) {
+    if (!product) return null;
+
+    // On ne garde que les produits "active"
+    if (String(product.status || "").toLowerCase() !== "active") {
+      return null;
+    }
+
+    const avg = Number(product.average_rating);
+    const reviewCount = Number(product.review_count);
+
+    return {
+      id: normId(product.id),
+      title: product.title || "",
+      image: pickImage(product),
+      price: product.price,
+      original_price: product.original_price,
+      formatted_price: product.formatted_price,
+      currency: product.currency,
+      converted_price: product.converted_price,
+      city: product.city_name || "",
+      shop: product.seller_fullname || "Softadastra",
+      // Étoiles : arrondi à l’entier, entre 0 et 5
+      stars: Number.isFinite(avg)
+        ? Math.max(0, Math.min(5, Math.round(avg)))
+        : 0,
+      // Nombre d’avis
+      sold: Number.isFinite(reviewCount) ? reviewCount : 0,
+      // Badge NEW ou BOOST
+      badge: String(product.condition_name || "")
+        .toLowerCase()
+        .includes("new")
+        ? "NEW"
+        : Number(product.boost) > 0
+        ? "BOOST"
+        : "",
+      // Compteur de likes (optionnel)
+      likes_count: Number(product.likes_count) || 0,
+    };
+  }
+
+  // Récupère 1 produit via /api/show/:id et renvoie directement un "card"
+  async function fetchProductById(id) {
+    const r = await fetch(`${API_BASE}/api/show/${id}`, {
+      credentials: "include",
+    });
+    if (!r.ok) return null;
+    try {
+      const data = await r.json(); // { product, user }
+      return mapShowProductToCard(data?.product);
+    } catch {
+      return null;
+    }
+  }
+
+  // --- Config Node (assure-toi d’avoir window.SA_NODE_API = "http://localhost:3000")
+  function authFetchOpts() {
+    return {
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    };
+  }
+
+  // 🔹 récupère les compteurs de likes pour une liste d'IDs
+  async function fetchLikesCounts(ids) {
+    if (!ids.length) return {};
+    const url = nodeUrl(
+      `/api/products/likes?ids=${encodeURIComponent(ids.join(","))}`
+    );
+    const res = await fetch(url, {
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+    if (!res.ok) throw new Error("likes.batch failed");
+    const data = await res.json();
+    const map = new Map();
+    for (const [k, v] of Object.entries(data?.counts || {})) {
+      map.set(Number(k), Number(v) || 0);
+    }
+    return map;
+  }
+
+  async function updateFavoritesBadge() {
+    try {
+      const sellerItems = await fetchUserProducts(PROFILE_USER_ID, {
+        limit: 1_000,
+      });
+      const ids = sellerItems.map((p) => Number(p.id)).filter(Number.isFinite);
+      if (!ids.length) {
+        const favBadge = document.getElementById("favorites-badge");
+        if (favBadge) {
+          favBadge.textContent = "";
+          favBadge.style.display = "none";
+        }
+        return;
+      }
+
+      const likeMap = await fetchLikesCounts(ids);
+      const items = sellerItems.filter(
+        (p) => (likeMap.get(Number(p.id)) || 0) > 0
+      );
+
+      const favBadge = document.getElementById("favorites-badge");
+      if (favBadge) {
+        if (items.length > 0) {
+          favBadge.textContent = String(items.length);
+          favBadge.style.display = "inline-block";
+        } else {
+          favBadge.textContent = "";
+          favBadge.style.display = "none";
+        }
+      }
+    } catch (e) {
+      console.error("updateFavoritesBadge error:", e);
+    }
+  }
+
+  // ----------------- Favorites (Seller's Popular items) -----------------
+  async function renderFavorites() {
+    // --- Shell UI
+    view.innerHTML = `
+    <section>
+      <h3 style="margin:6px 0 10px;">Favorites</h3>
+      <div id="grid-favs" class="listings-grid"></div>
+      <div id="favs-cta" style="text-align:center;margin:12px 0;display:none;">
+        <button id="favs-see-more" class="sa-btn sa-btn--primary" type="button">See more</button>
+      </div>
+      <div id="favs-loader" style="text-align:center;padding:12px;display:none;">Loading…</div>
+    </section>
+  `;
+
+    const grid = view.querySelector("#grid-favs");
+    const ctaBox = view.querySelector("#favs-cta");
+    const ctaBtn = view.querySelector("#favs-see-more");
+    const loader = view.querySelector("#favs-loader");
+
+    // === Empty / Error states injected OUTSIDE the grid ===
+    function injectAfterGrid(html, role = "status") {
+      grid.style.display = "none";
+      const next = grid.nextElementSibling;
+      if (next && next.classList?.contains("favs-empty-block")) return; // avoid duplicates
+      const box = document.createElement("div");
+      box.className = "favs-empty-block";
+      box.setAttribute("role", role);
+      box.innerHTML = html;
+      grid.insertAdjacentElement("afterend", box);
+      ctaBox.style.display = "none";
+    }
+
+    function showEmptyState({ title, text, svg }) {
+      injectAfterGrid(
+        `
+      <div style="text-align:center;padding:20px;border:1px dashed #e7e9ee;border-radius:12px;">
+        ${svg}
+        <div style="font-weight:700;color:#0b0c0f;margin-bottom:4px;">${title}</div>
+        <div style="color:#667085;font-size:.95rem;">${text}</div>
+      </div>
+    `,
+        "status"
+      );
+    }
+
+    function showErrorState() {
+      injectAfterGrid(
+        `
+      <div style="text-align:center;padding:20px;border:1px dashed #e7e9ee;border-radius:12px;">
+        <svg viewBox="0 0 24 24" width="48" height="48" aria-hidden="true"
+             style="display:block;margin:0 auto 10px;color:#9aa1ac;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;">
+          <!-- Alert triangle -->
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+          <path d="M12 9v4"></path>
+          <path d="M12 17h.01"></path>
+        </svg>
+        <div style="font-weight:700;color:#0b0c0f;margin-bottom:4px;">Unable to load favorites</div>
+        <div style="color:#667085;font-size:.95rem;">Please try again later.</div>
+      </div>
+    `,
+        "alert"
+      );
+    }
+
+    // If later we do have items, restore grid and remove empty block
+    function restoreGridIfHidden() {
+      if (grid.style.display === "none") {
+        grid.style.display = "";
+        const next = grid.nextElementSibling;
+        if (next && next.classList?.contains("favs-empty-block")) next.remove();
+      }
+    }
+
+    // --- Pagination config (client-side)
+    const LIMIT_FIRST = 5;
+    const LIMIT_NEXT = 10;
+    let nextIndex = 0;
+    let isLoading = false;
+    let hasMore = true;
+
+    // --- Helpers
+    const nfCompact = new Intl.NumberFormat("en", {
+      notation: "compact",
+      compactDisplay: "short",
+      maximumFractionDigits: 1,
+    });
+    const fmtCount = (n = 0) =>
+      nfCompact
+        .format(n)
+        .replace(/K\b/i, "k")
+        .replace(/M\b/i, "m")
+        .replace(/B\b/i, "b");
+
+    function appendCardsHTML(htmlList) {
+      const frag = document.createDocumentFragment();
+      for (const html of htmlList) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = html;
+        if (wrap.firstElementChild) frag.appendChild(wrap.firstElementChild);
+      }
+      grid.appendChild(frag);
+    }
+
+    function cardHTML(it) {
+      return `
+      <article class="card" data-product-id="${
+        it.id
+      }" style="content-visibility:auto;contain-intrinsic-size:300px 400px;">
+        <a href="/item/${it.id}" style="text-decoration:none;color:inherit;">
+          <div class="media">
+            <img loading="lazy" decoding="async" fetchpriority="low"
+                 src="${it.image}"
+                 srcset="${it.image}?w=200 200w, ${it.image}?w=400 400w, ${
+        it.image
+      }?w=600 600w"
+                 sizes="(max-width:600px) 45vw, (max-width:1024px) 30vw, 220px"
+                 alt="${it.title}">
+            <!-- Like overlay -->
+            <button type="button"
+                    class="sa-like"
+                    aria-label="${
+                      it.likes_count === 1
+                        ? "1 person likes this item"
+                        : (it.likes_count || 0) + " people like this item"
+                    }"
+                    title="${
+                      it.likes_count === 1
+                        ? "1 person likes this item"
+                        : (it.likes_count || 0) + " people like this item"
+                    }">
+              <svg class="sa-like__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M12 21s-6.5-4.35-9.33-7.2C1.1 12.2 1 9.5 3 7.5c1.9-1.9 4.9-1.7 6.9.3L12 9l2.1-1.2c2-2 5-2.3 6.9-.3s1.9 4.7.3 6.3C18.5 16.65 12 21 12 21z" fill="currentColor"></path>
+              </svg>
+              <span class="sa-like__count" data-like-count="${
+                it.likes_count || 0
+              }">${fmtCount(it.likes_count || 0)}</span>
+            </button>
+          </div>
+
+          <div class="card-body">
+            <h4 class="title clamp-2" title="${it.title}">${it.title}</h4>
+            <div class="price-block">${formatPriceBlock(it)}</div>
+            <div class="rating" title="${
+              it.sold
+            } reviews, rating ${(Number.isFinite(it.avg) ? it.avg : 0).toFixed(
+        1
+      )}/5">
+              ${renderStarsFromAvg(Number.isFinite(it.avg) ? it.avg : it.stars)}
+              <span class="note">${
+                Number.isFinite(it.avg)
+                  ? it.avg.toFixed(1)
+                  : (it.stars || 0).toFixed(1)
+              }</span>
+              <span class="count">(${it.sold})</span>
+            </div>
+            <div class="meta">
+              ${it.city ? `<span>${it.city}</span>` : ``}
+              ${it.shop ? `<span>${it.shop}</span>` : ``}
+            </div>
+          </div>
+        </a>
+      </article>`;
+    }
+
+    // --- Fetch + compute data once, then paginate locally
+    let items = [];
+    try {
+      const sellerItems = await fetchUserProducts(PROFILE_USER_ID, {
+        limit: 200,
+      });
+
+      // No active listings for this seller
+      if (!sellerItems?.length) {
+        showEmptyState({
+          title: "No active listings",
+          text: "This seller hasn’t published any active items yet.",
+          svg: `
+          <svg viewBox="0 0 24 24" width="48" height="48" aria-hidden="true"
+               style="display:block;margin:0 auto 10px;color:#9aa1ac;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;">
+            <!-- Storefront -->
+            <path d="M3 9l1-5h16l1 5v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9zM5 4l-.6 3h15.2L19 4z"></path>
+            <path d="M7 13h10M7 17h7"></path>
+          </svg>`,
+        });
+        hasMore = false;
+        return;
+      }
+
+      const ids = sellerItems.map((p) => Number(p.id)).filter(Number.isFinite);
+      const likeMap = await fetchLikesCounts(ids); // Map<id, count>
+
+      items = sellerItems
+        .map((p) => ({
+          ...p,
+          likes_count: likeMap.get(Number(p.id)) || 0,
+        }))
+        .filter((p) => p.likes_count > 0)
+        .sort((a, b) => b.likes_count - a.likes_count);
+
+      // No favorites yet
+      if (!items.length) {
+        showEmptyState({
+          title: "No favorites yet",
+          text: "None of this seller’s products have been added to favorites yet.",
+          svg: `
+          <svg viewBox="0 0 24 24" width="48" height="48" aria-hidden="true"
+               style="display:block;margin:0 auto 10px;color:#9aa1ac;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;">
+            <!-- Heart -->
+            <path d="M12 21s-6.5-4.35-9.33-7.2C1.1 12.2 1 9.5 3 7.5c1.9-1.9 4.9-1.7 6.9.3L12 9l2.1-1.2c2-2 5-2.3 6.9-.3s1.9 4.7.3 6.3C18.5 16.65 12 21 12 21z"></path>
+          </svg>`,
+        });
+        hasMore = false;
+        return;
+      }
+
+      // If we have items, make sure grid is visible (in case it was hidden)
+      restoreGridIfHidden();
+    } catch (e) {
+      console.error("renderFavorites error:", e);
+      showErrorState();
+      hasMore = false;
+      return;
+    }
+
+    // --- Local paging
+    async function loadMoreLocal(limit) {
+      if (isLoading || !hasMore) return;
+      isLoading = true;
+      loader.style.display = "block";
+
+      try {
+        const slice = items.slice(nextIndex, nextIndex + limit);
+        if (!slice.length) {
+          hasMore = false;
+          return;
+        }
+        appendCardsHTML(slice.map(cardHTML));
+        nextIndex += slice.length;
+        if (nextIndex >= items.length) hasMore = false;
+      } finally {
+        isLoading = false;
+        loader.style.display = "none";
+      }
+    }
+
+    // --- 1) First render
+    await loadMoreLocal(LIMIT_FIRST);
+    ctaBox.style.display = hasMore ? "block" : "none";
+
+    // --- 2) Infinite scroll (after click)
+    let startedScroll = false;
+    let observer = null;
+
+    function startInfiniteScroll() {
+      if (startedScroll) return;
+      startedScroll = true;
+
+      const sentinel = document.createElement("div");
+      sentinel.id = "favs-sentinel";
+      grid.after(sentinel);
+
+      observer = new IntersectionObserver(
+        (entries) => {
+          if (entries[0].isIntersecting) {
+            loadMoreLocal(LIMIT_NEXT);
+          }
+        },
+        {
+          rootMargin: "300px",
+        }
+      );
+
+      observer.observe(sentinel);
+    }
+
+    ctaBtn?.addEventListener("click", async () => {
+      ctaBox.style.display = "none";
+      await loadMoreLocal(LIMIT_NEXT);
+      if (hasMore) startInfiniteScroll();
+    });
+  }
+
+  // ============================
+  // Config & helpers (global)
+  // ============================
+
+  function q(sel, root = document) {
+    return root.querySelector(sel);
+  }
+
+  function withTimeout(promiseFactory, ms = 12000, label = "request") {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    return Promise.race([
+      (async () => {
+        try {
+          const res = await promiseFactory(ctrl.signal);
+          clearTimeout(t);
+          return res;
+        } catch (e) {
+          clearTimeout(t);
+          throw new Error(`${label} timeout/abort: ${e.message || e}`);
+        }
+      })(),
+    ]);
+  }
+
+  async function fetchJSON(url, opts = {}) {
+    const run = (signal) =>
+      fetch(url, {
+        credentials: "include",
+        signal,
+        ...opts,
+      });
+    const res = await withTimeout(run, 15000, `GET ${url}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+    return res.json();
+  }
+
+  // Transforme un "view" (Element ou sélecteur) en Element, sinon lève une erreur claire
+  function asElement(elOrSelector) {
+    if (elOrSelector instanceof Element) return elOrSelector;
+    if (typeof elOrSelector === "string") {
+      const el = document.querySelector(elOrSelector);
+      if (el) return el;
+    }
+    throw new Error(
+      "renderReviews: container introuvable (view). Passe un Element valide ou un sélecteur existant."
+    );
+  }
+
+  // Monte/retourne un mount #reviews-view sous le container global `view`
+  function ensureReviewsMount(parentCandidate) {
+    const parent =
+      (parentCandidate instanceof Element && parentCandidate) ||
+      (typeof parentCandidate === "string" &&
+        document.querySelector(parentCandidate)) ||
+      (typeof window !== "undefined" && typeof view !== "undefined" && view) ||
+      document.body;
+
+    let el = parent.querySelector("#reviews-view");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "reviews-view";
+      parent.appendChild(el);
+    }
+    return el;
+  }
+
+  function starsHTML(n) {
+    const full = Math.floor(n || 0);
+    const half = n - full >= 0.5 ? 1 : 0;
+    const empty = 5 - full - half;
+    return `<span class="sa-stars" aria-label="${n || 0}/5">
+    ${"★".repeat(full)}${half ? "⯨" : ""}${"☆".repeat(Math.max(0, empty))}
+  </span>`;
+  }
+
+  function timeAgo(dtStr) {
+    const d = new Date(dtStr);
+    if (Number.isNaN(+d)) return "";
+    const secs = Math.floor((Date.now() - d.getTime()) / 1000);
+    const mins = Math.floor(secs / 60),
+      hrs = Math.floor(mins / 60),
+      days = Math.floor(hrs / 24);
+    if (secs < 60) return "à l’instant";
+    if (mins < 60) return `il y a ${mins} min`;
+    if (hrs < 24) return `il y a ${hrs} h`;
+    return `il y a ${days} j`;
+  }
+
+  function skeletonCard() {
+    return `
+  <article class="review skel">
+    <div class="head">
+      <div class="avatar-skel"></div>
+      <div class="who">
+        <div class="line-skel w80"></div>
+        <div class="line-skel w40"></div>
+      </div>
+    </div>
+    <div class="line-skel w60" style="margin:8px 0 6px;"></div>
+    <div class="line-skel w100"></div>
+    <div class="line-skel w90"></div>
+  </article>`;
+  }
+
+  function reviewCard(r) {
+    const author = r.author || r.author_name || r.user_name || "Buyer";
+    const avatar =
+      r.author_photo ||
+      r.avatar ||
+      r.avatar_url ||
+      r.user_avatar ||
+      "https://i.pravatar.cc/80?img=15";
+    const rating = Number(r.stars ?? r.rating ?? 0);
+    const text = r.text || r.comment || r.message || "";
+    const createdAt = r.created_at || r.time || "";
+
+    return `
+  <article class="review" style="content-visibility:auto;contain-intrinsic-size:220px 240px;">
+    <div class="head">
+      <img loading="lazy" decoding="async" fetchpriority="low"
+           src="${avatar}" width="44" height="44" alt="${author}">
+      <div class="who">
+        <span class="name">${author}</span>
+        <span class="time">${
+          createdAt ? timeAgo(createdAt) : r.time ?? "recently"
+        }</span>
+      </div>
+    </div>
+    <div class="stars">${starsHTML(rating)}</div>
+    <div class="text">${text}</div>
+  </article>`;
+  }
+
+  function renderHeader(container, stats) {
+    const avg = Number(stats?.average_rating ?? 0).toFixed(1);
+    const count = Number(stats?.review_count ?? 0);
+    container.innerHTML = `
+    <section class="sa-rev-section">
+      <header class="sa-rev-header">
+        <div class="sa-rev-title">
+          <h3>Évaluations</h3>
+          <p class="muted">${count} avis • Moyenne ${avg}/5 ${starsHTML(
+      avg
+    )}</p>
+        </div>
+        <div class="sa-rev-actions">
+          <label class="sa-rev-order">
+            Tri :
+            <select id="saRevOrder">
+              <option value="DESC" selected>Plus récents</option>
+              <option value="ASC">Plus anciens</option>
+            </select>
+          </label>
+        </div>
+      </header>
+      <div id="grid-reviews" class="reviews"></div>
+      <div class="sa-rev-footer">
+        <button id="saRevLoadMore" class="sa-btn">Charger plus</button>
+      </div>
+    </section>
+  `;
+  }
+
+  function chunkRenderIntoFallback(container, rows, { chunk = 10 } = {}) {
+    let i = 0;
+
+    function step() {
+      const slice = rows.slice(i, i + chunk).join("");
+      container.insertAdjacentHTML("beforeend", slice);
+      i += chunk;
+      if (i < rows.length) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ============================
+  // Reviews d'un VENDEUR (par userId)
+  // ============================
+  function resolveSellerId(explicitId) {
+    // 1) param direct
+    const p = Number(explicitId);
+    if (Number.isFinite(p) && p > 0) return p;
+
+    // 2) variable globale présente sur la page vendeur
+    const g = Number(window.PROFILE_USER_ID || window.SA_PROFILE_USER_ID);
+    if (Number.isFinite(g) && g > 0) return g;
+
+    // 3) data-* dans le DOM
+    const el = document.querySelector("[data-user-id],[data-seller-id]");
+    if (el) {
+      const v = Number(el.dataset.userId ?? el.dataset.sellerId);
+      if (Number.isFinite(v) && v > 0) return v;
+    }
+
+    // 4) querystring
+    const qs = new URLSearchParams(location.search);
+    for (const key of ["user_id", "seller_id", "uid"]) {
+      const v = Number(qs.get(key));
+      if (Number.isFinite(v) && v > 0) return v;
+    }
+
+    // 5) pathname: /seller/42, /user/42, /profile/42
+    const m = location.pathname.match(
+      /\/(seller|user|profile)\/(\d+)(?:\/|$)/i
+    );
+    if (m && Number.isFinite(Number(m[2]))) return Number(m[2]);
+
+    return 0;
+  }
+
+  function ensureMount(id) {
+    let el = view.querySelector(`#${id}`);
+    if (!el) {
+      el = document.createElement("section");
+      el.id = id;
+      view.innerHTML = ""; // on nettoie le conteneur de l’onglet courant
+      view.appendChild(el);
+    } else {
+      view.innerHTML = ""; // on ne garde qu'un mount
+      view.appendChild(el);
+    }
+    return el;
+  }
+
+  function setBadge(el, count) {
+    if (!el) return;
+    const n = Number(count) || 0;
+    if (n > 0) {
+      el.textContent = String(n);
+      el.style.display = "inline-block";
+    } else {
+      el.textContent = "";
+      el.style.display = "none";
+    }
+  }
+
+  async function updateReviewsBadgeBoot() {
+    try {
+      const sellerId =
+        typeof resolveSellerId === "function"
+          ? resolveSellerId()
+          : PROFILE_USER_ID;
+      const url = `/api/user/${encodeURIComponent(sellerId)}/reviews/stats`;
+      // si tu as déjà fetchJSON() global, utilise-le :
+      const stats =
+        typeof fetchJSON === "function"
+          ? await fetchJSON(url)
+          : await (
+              await fetch(url, {
+                credentials: "include",
+              })
+            ).json();
+
+      const count = Number(stats?.review_count ?? 0);
+      setBadge(document.getElementById("reviews-badge"), count);
+    } catch (e) {
+      console.warn("updateReviewsBadgeBoot error:", e);
+      setBadge(document.getElementById("reviews-badge"), 0);
+    }
+  }
+
+  // Signature tolérante :
+  // - renderReviews()                      -> auto-mount dans view + auto sellerId
+  // - renderReviews(view)                  -> auto sellerId
+  // - renderReviews(view, sellerId)        -> ok
+  // - renderReviews(view, sellerId, opts)  -> ok
+  async function renderReviews({ token } = {}) {
+    if (isStale(token)) return;
+
+    const mount = ensureMount("reviews-view");
+
+    // header skeleton local à l’onglet (pas le skeleton "produits")
+    mount.innerHTML = `
+    <section class="sa-rev-section">
+      <header class="sa-rev-header">
+        <div class="sa-rev-title">
+          <h3>Évaluations</h3>
+          <p class="muted">Chargement…</p>
+        </div>
+      </header>
+      <div id="grid-reviews" class="reviews">
+        ${Array.from({ length: 6 }).map(skeletonCard).join("")}
+      </div>
+      <div class="sa-rev-footer">
+        <button id="saRevLoadMore" class="sa-btn" disabled>Charger plus</button>
+      </div>
+    </section>
+  `;
+    if (isStale(token)) return;
+
+    // fetch stats
+    let stats = {
+      average_rating: 0,
+      review_count: 0,
+    };
+    try {
+      stats = await fetchJSON(`/api/user/${resolveSellerId()}/reviews/stats`);
+      // ✅ MAJ badge à chaud
+      setBadge(
+        document.getElementById("reviews-badge"),
+        Number(stats?.review_count ?? 0)
+      );
+    } catch (e) {
+      console.warn(e);
+    }
+    if (isStale(token)) return;
+
+    // maj header sans toucher 'view'
+    const title = mount.querySelector(".sa-rev-title .muted");
+    if (title) {
+      const avg = Number(stats?.average_rating ?? 0).toFixed(1);
+      const count = Number(stats?.review_count ?? 0);
+      title.innerHTML = `${count} avis • Moyenne ${avg}/5 ${starsHTML(avg)}`;
+    }
+
+    // page 1
+    await loadPage(1);
+
+    async function loadPage(p) {
+      const url = new URL(
+        `/api/user/${resolveSellerId()}/reviews`,
+        location.origin
+      );
+      url.searchParams.set("limit", "10");
+      url.searchParams.set("page", String(p));
+      url.searchParams.set("order", "DESC");
+
+      const data = await fetchJSON(url.toString());
+      if (isStale(token)) return;
+
+      const items = data?.items || [];
+      const grid = mount.querySelector("#grid-reviews");
+
+      if (!items.length && p === 1) {
+        mount.innerHTML = `
+      <div class="about-box about-empty" role="status" aria-live="polite" style="text-align:center;padding:20px;">
+        <svg viewBox="0 0 24 24" width="48" height="48" aria-hidden="true"
+             style="display:block;margin:0 auto 10px;color:#9aa1ac;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;">
+          <!-- Star / review icon -->
+          <path d="M12 3.5l2.47 5 5.53.8-4 3.9.94 5.5L12 16.9 7.06 18.7 8 13.9l-4-3.9 5.53-.8L12 3.5z"></path>
+        </svg>
+        <div style="font-weight:700;color:#0b0c0f;margin-bottom:4px;">No reviews yet</div>
+        <div style="color:#667085;font-size:.95rem;">When buyers leave reviews, they’ll appear here.</div>
+      </div>`;
+        return;
+      }
+
+      if (p === 1) grid.innerHTML = "";
+
+      const rows = items.map(reviewCard);
+      if (typeof window.chunkRenderInto === "function") {
+        window.chunkRenderInto(grid, rows, {
+          chunk: 10,
+          delay: 16,
+          gridClass: "reviews",
+        });
+      } else {
+        grid.insertAdjacentHTML("beforeend", rows.join(""));
+      }
+    }
+  }
+
+  async function renderAbout() {
+    const bio = document.getElementById("user-bio")?.textContent?.trim() || "";
+    const name =
+      document.getElementById("user-fullname")?.textContent?.trim() ||
+      "Utilisateur";
+    const join = ""; // Pas de champ dans le DOM pour la date d'inscription
+    const loc = ""; // Pas de champ localisation dans ton HTML
+    const total = ""; // Pas de champ ventes totales dans ton HTML
+    const avatar =
+      document.getElementById("profile_image_preview")?.src ||
+      "https://via.placeholder.com/100?text=User";
+
+    view.innerHTML = `
+      <section class="about-box sa-about-section">
+          <div class="sa-about-header">
+              <img src="${avatar}" alt="${name}" class="sa-about-avatar">
+              <div>
+                  <h3 class="sa-about-name">${name}</h3>
+                  ${
+                    loc
+                      ? `<p class="sa-about-loc"><i class="fas fa-map-marker-alt"></i> ${loc}</p>`
+                      : ""
+                  }
+                  ${
+                    join
+                      ? `<p class="sa-about-join">Membre depuis ${join}</p>`
+                      : ""
+                  }
+              </div>
+          </div>
+          <div class="sa-about-bio">
+              <h4>À propos</h4>
+              <p>${
+                bio || "Ce vendeur n’a pas encore renseigné de description."
+              }</p>
+          </div>
+          <div class="sa-about-stats">
+              ${
+                total
+                  ? `<div><strong>${total}</strong><span>ventes réalisées</span></div>`
+                  : ""
+              }
+              <div><strong>★</strong><span>Voir évaluations</span></div>
+          </div>
+      </section>
+      `;
+  }
+
+  async function renderProShop({ token }) {
+    if (isStale(token)) return;
+
+    // ---- Helpers (inchangés) ----
+    const setStatusChip = (el, statusText) => {
+      if (!el) return;
+      el.textContent = statusText || "-";
+      el.classList.add("chip");
+      el.classList.remove("chip--pending", "chip--approved", "chip--rejected");
+      const s = String(statusText || "").toLowerCase();
+      if (s.includes("pending") || s.includes("attente"))
+        el.classList.add("chip--pending");
+      else if (
+        s.includes("approved") ||
+        s.includes("active") ||
+        s.includes("actif")
+      )
+        el.classList.add("chip--approved");
+      else if (s.includes("rejected") || s.includes("rejet"))
+        el.classList.add("chip--rejected");
+    };
+
+    const statusIconSVG = (status) => {
+      const s = String(status || "").toLowerCase();
+      if (s === "approved" || s === "active" || s === "actif") {
+        return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="#28a745"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 14l-4-4 1.41-1.41L11 13.17l5.59-5.59L18 9l-7 7z"/></svg>`;
+      }
+      if (s === "pending" || s.includes("attente")) {
+        return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="#f59e0b"><path d="M6 2h12v2l-4 6v2l4 6v2H6v-2l4-6v-2L6 4V2z"/></svg>`;
+      }
+      if (s === "rejected" || s.includes("rejet")) {
+        return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="#dc3545"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>`;
+      }
+      return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="#6b7280"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>`;
+    };
+
+    // ---- API statut ----
+    let apiData = null;
+    try {
+      const res = await fetch("/api/seller/subscription/status", {
+        credentials: "same-origin",
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) apiData = json.data || null;
+    } catch (_) {}
+
+    const pickDisplaySource = (data) => {
+      if (!data) return null;
+      const req = data.subscription_request || data.subscription || null;
+      const act = data.current || data.active || null;
+
+      if (req && String(req.status || "").toLowerCase() !== "approved")
+        return {
+          plan: req.plan,
+          status: req.status,
+        };
+      if (act)
+        return {
+          plan: act.plan,
+          status: act.effective_status || act.status,
+        };
+      if (req)
+        return {
+          plan: req.plan,
+          status: req.status,
+        };
+      return null;
+    };
+
+    const chosen = pickDisplaySource(apiData);
+    const chosenPlan = chosen?.plan || null;
+    const chosenStatus = (chosen?.status || "").toLowerCase();
+
+    // ---- CTAs minimalistes (on pousse vers /pricing) ----
+    let ctaPrimaryHTML = "";
+    let ctaSecondaryHTML = "";
+
+    if (!chosen) {
+      ctaPrimaryHTML = `<a href="/pricing" class="sa-btn"><i class="fas fa-tags"></i> View plans</a>`;
+      ctaSecondaryHTML = `<a href="/shop/home" class="sa-btn-outline"><i class="fas fa-wrench"></i> Go to dashboard</a>`;
+    } else if (chosenStatus === "pending" || chosenStatus.includes("attente")) {
+      ctaPrimaryHTML = `<a class="sa-btn pending-disabled disabled"><i class="fas fa-hourglass-half"></i> Waiting for review</a>`;
+      ctaSecondaryHTML = `<a href="/pricing" class="sa-btn-outline"><i class="fas fa-tags"></i> Change plan</a>`;
+    } else if (["approved", "active", "actif"].includes(chosenStatus)) {
+      ctaPrimaryHTML = `<a class="sa-btn success-disabled disabled"><i class="fas fa-check"></i> Plan active</a>`;
+      ctaSecondaryHTML = `<a href="/shop/home" class="sa-btn-outline"><i class="fas fa-wrench"></i> Go to dashboard</a>`;
+    } else if (chosenStatus === "rejected" || chosenStatus.includes("rejet")) {
+      ctaPrimaryHTML = `<a href="/pricing" class="sa-btn"><i class="fas fa-sync-alt"></i> Resubmit proof</a>`;
+      ctaSecondaryHTML = `<a class="sa-btn-outline rejected-disabled disabled"><i class="fas fa-ban"></i> Rejected</a>`;
+    } else {
+      ctaPrimaryHTML = `<a href="/pricing" class="sa-btn"><i class="fas fa-tags"></i> View plans</a>`;
+      ctaSecondaryHTML = `<a href="/shop/home" class="sa-btn-outline"><i class="fas fa-wrench"></i> Go to dashboard</a>`;
+    }
+
+    // ---- UI minimaliste (sans badges ni liste de features) ----
+    const statusCardHTML = chosen
+      ? `
+    <div class="subscription-status-wrapper">
+      <div id="currentSubscriptionStatus" class="subscription-status-card">
+        <div class="status-icon" id="statusIcon">${statusIconSVG(
+          chosenStatus
+        )}</div>
+        <div class="status-content">
+          <div class="status-title">
+            Current subscription: <strong id="currentPlan">${
+              chosenPlan || "-"
+            }</strong>
+          </div>
+          <div class="status-row">
+            <span class="status-label">Status</span>
+            <span id="currentStatus" class="chip">-</span>
+          </div>
+        </div>
+      </div>
+    </div>`
+      : "";
+
+    view.innerHTML = `
+    ${statusCardHTML}
+    <section class="proshop-box sa-proshop-section">
+      <div class="sa-proshop-header">
+        <i class="fas fa-briefcase"></i>
+        <h3>Professional Shop</h3>
+      </div>
+      <p class="sa-proshop-subtitle">Manage your shop. Plans & details are available on the pricing page.</p>
+
+      <div class="sa-proshop-actions" style="margin-top:12px;">
+        ${ctaPrimaryHTML}
+        ${ctaSecondaryHTML}
+      </div>
+    </section>
+  `;
+
+    // ---- Post-render : chip statut (texte concis, pas de note détaillée) ----
+    if (chosen && !isStale(token)) {
+      const chip = document.getElementById("currentStatus");
+      setStatusChip(chip, chosenStatus);
+    }
+  }
+
+  // ---- Boot (onglet par défaut) ----
+  navigate(DEFAULT_TAB, {
+    smooth: false,
+    scroll: false,
+  });
+})();

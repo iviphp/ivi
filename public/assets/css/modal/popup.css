@@ -1,0 +1,194 @@
+/* ========= Base overlay ========= */
+.shop-popup {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: none; /* sera mis à "flex" en JS */
+  justify-content: center;
+  align-items: flex-end; /* bottom-sheet par défaut (mobile) */
+  -webkit-overflow-scrolling: touch;
+}
+
+.shop-popup-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: saturate(120%) blur(2px);
+}
+
+/* ========= Sheet / Card ========= */
+.shop-popup-sheet {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 640px;
+  background: #fff;
+  color: #111827;
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  padding: 18px 16px 16px;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+  transform: translateY(0);
+  will-change: transform, opacity;
+  animation: slideUp 0.25s ease-out;
+  max-height: calc(100dvh - env(safe-area-inset-bottom) - 24px);
+  overflow: hidden; /* header + body: la body gère le scroll */
+}
+
+/* Header / Body */
+.shop-popup-grabber {
+  width: 44px;
+  height: 5px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  margin: 4px auto 12px;
+}
+
+.shop-popup-header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.popup-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.popup-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #111827;
+}
+
+.shop-popup-body {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px 4px 6px;
+  max-height: calc(100% - 56px); /* laisse la place au header/close btn */
+}
+
+.popup-text {
+  margin: 6px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #374151;
+}
+
+.popup-link {
+  display: inline-block;
+  margin-top: 12px;
+  padding: 10px 16px;
+  background: #ff9900;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 10px;
+  font-weight: 700;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.popup-link:hover {
+  transform: translateY(-1px);
+  background: #e68600;
+}
+
+/* Close */
+.shop-popup-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  border: 0;
+  background: transparent;
+  font-size: 22px;
+  color: #9ca3af;
+  line-height: 1;
+  cursor: pointer;
+}
+.shop-popup-close:hover {
+  color: #6b7280;
+}
+
+/* Success icon style */
+.success-icon {
+  stroke: #16a34a !important;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  border-radius: 999px;
+  background: #e8f5e9;
+}
+
+/* ========= Desktop: modal centré ========= */
+@media (min-width: 992px) {
+  .shop-popup {
+    align-items: center; /* centre verticalement l'ensemble */
+  }
+
+  /* On ne dépend plus du flex parent pour le centrage :
+     on centre la "sheet" elle-même en fixed + translate */
+  .shop-popup-sheet {
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%); /* centre exact */
+    border-radius: 16px; /* tous les coins sur desktop */
+    padding: 20px 18px 18px;
+    width: min(560px, 92vw);
+    max-height: min(84dvh, 760px);
+    box-shadow: 0 22px 70px rgba(0, 0, 0, 0.25);
+    animation: popIn 0.18s ease-out;
+  }
+
+  .shop-popup-grabber {
+    display: none;
+  } /* pas utile sur desktop */
+
+  .popup-title {
+    font-size: 18px;
+  }
+  .popup-text {
+    font-size: 15px;
+  }
+}
+
+/* ========= Animations ========= */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes popIn {
+  from {
+    transform: translate(-50%, -50%) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+/* ========= Respect prefers-reduced-motion ========= */
+@media (prefers-reduced-motion: reduce) {
+  .shop-popup-sheet {
+    animation: none !important;
+  }
+  .popup-link {
+    transition: none !important;
+  }
+}
+
+/* ========= Helper : fond derrière flouté ========= */
+.blur-background {
+  filter: blur(2px);
+}
+.shop-popup-body {
+  text-align: center;
+}
