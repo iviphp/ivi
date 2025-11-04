@@ -6,6 +6,7 @@ namespace Ivi\Core\Bootstrap;
 
 use Ivi\Http\Request;
 use Ivi\Router\Router;
+use Ivi\Core\Debug\Logger;
 
 final class App
 {
@@ -24,6 +25,14 @@ final class App
 
         // 1) Bootstrap env + constants + services externes
         Loader::bootstrap($this->baseDir);
+
+        Logger::configure([
+            'app_namespaces' => ['Ivi\\Controllers\\', 'App\\'],
+            'trace_strategy' => 'balanced',
+            // Optionnel : restreindre la trace aux namespaces framework
+            // 'trace_only_namespaces' => ['Ivi\\', 'Ivi\\Controllers\\'],
+            'max_trace' => 10,
+        ]);
 
         // 2) Core components
         $this->request = Request::fromGlobals();
