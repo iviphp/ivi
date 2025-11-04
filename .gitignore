@@ -1,0 +1,52 @@
+cmd.md
+.vscode/
+.git/
+public/images/
+public/vendor/
+public/.well-known/
+.env
+.env.local
+.env.staging
+.env.production
+request.log
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDE
+.idea/
+.vscode/
+*.swp
+
+# PHP
+vendor/
+composer.phar
+# (Garde composer.lock versionné si c’est une app; ne pas l’ignorer)
+
+# Logs / Cache / Tests
+*.log
+logs/
+storage/
+cache/
+tmp/
+coverage/
+.phpunit.result.cache
+
+# Env & Secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.keystore
+*.jks
+*.crt
+*.der
+
+# Reports
+gitleaks-report.json
+
+# Node / Front
+node_modules/
+dist/
+build/

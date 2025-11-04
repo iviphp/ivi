@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "Good book",
+  "short_name": "Good book",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ff9900",
+  "theme_color": "#ff9900",
+  "description": "",
+  "icons": [
+    {
+      "src": "https://res.cloudinary.com/dwjbed2xb/image/upload/v1757224088/android-chrome-192x192_a3xk7q.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://res.cloudinary.com/dwjbed2xb/image/upload/v1757224089/android-chrome-512x512_lbahag.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
