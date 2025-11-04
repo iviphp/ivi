@@ -8,6 +8,7 @@ use Ivi\Http\Request;
 use Ivi\Http\Exceptions\NotFoundHttpException;
 use Ivi\Http\Exceptions\MethodNotAllowedHttpException;
 use RuntimeException;
+use Ivi\Core\Debug\Callsite;
 
 final class Router
 {
@@ -71,31 +72,32 @@ final class Router
         $path   = $request->path();
 
         if (!isset($this->routes[$method])) {
-            // méthode HTTP inconnue de notre table → on laisse Kernel gérer (500)
             throw new RuntimeException("HTTP method not supported: $method");
         }
 
-        // 1) Essaye de matcher sur la méthode demandée
         foreach ($this->routes[$method] as $route) {
             if ($route->matches($method, $path)) {
-                return $route->execute(
-                    resolver: $this->resolver,
-                    queryParams: $request->query(),
-                    bodyParams: $this->parseBody($request),
-                    request: $request
-                );
+                try {
+                    return $route->execute(
+                        resolver: $this->resolver,
+                        queryParams: $request->query(),
+                        bodyParams: $this->parseBody($request),
+                        request: $request
+                    );
+                } finally {
+                    // filet de sécurité (optionnel)
+                    Callsite::clear();
+                }
             }
         }
 
-        // 2) Si pas trouvé: vérifier si le chemin existe sur d'autres méthodes → 405
         $allowed = $this->allowedMethodsForPath($path, $method);
         if (!empty($allowed)) {
             throw new MethodNotAllowedHttpException($allowed);
         }
-
-        // 3) Sinon → 404
         throw new NotFoundHttpException('Route not found.');
     }
+
 
     private function parseBody(Request $request): array
     {

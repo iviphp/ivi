@@ -9,6 +9,7 @@ use ReflectionFunction;
 use ReflectionMethod;
 use InvalidArgumentException;
 use RuntimeException;
+use Ivi\Core\Debug\Callsite;
 
 final class Route
 {
@@ -175,21 +176,55 @@ final class Route
         return $bodyParams + $queryParams + $this->params + $this->defaults;
     }
 
-    private function invokeClosure(\Closure $closure, array $args, ?\Ivi\Http\Request $request): mixed
-    {
-        $ref = new \ReflectionFunction($closure);
-        $ordered = $this->orderArgsForCallable($ref->getParameters(), $args, $request);
-        return $closure(...$ordered);
-    }
-
     private function invokeMethod(object $controller, string $method, array $args, ?\Ivi\Http\Request $request): mixed
     {
         if (!method_exists($controller, $method)) {
             throw new RuntimeException(get_class($controller) . "::$method not found.");
         }
+
         $ref = new \ReflectionMethod($controller, $method);
-        $ordered = $this->orderArgsForCallable($ref->getParameters(), $args, $request);
-        return $controller->$method(...$ordered);
+
+        // >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        // Marque le vrai callsite (HomeController::home)
+        Callsite::set([
+            'class'  => get_class($controller),
+            'method' => $method,
+            'file'   => $ref->getFileName() ?: '',
+            'line'   => (int)$ref->getStartLine(),
+        ]);
+        // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+        try {
+            $ordered = $this->orderArgsForCallable($ref->getParameters(), $args, $request);
+            return $controller->$method(...$ordered);
+        } finally {
+            Callsite::clear();
+        }
+    }
+
+    private function invokeClosure(\Closure $closure, array $args, ?\Ivi\Http\Request $request): mixed
+    {
+        $ref = new \ReflectionFunction($closure);
+
+        $fnFile = $ref->getFileName() ?: '';
+        $fnLine = (int)$ref->getStartLine();
+
+        // Heuristique : on n’écrase pas un callsite controller existant
+        if (\Ivi\Core\Debug\Callsite::get() === null) {
+            Callsite::set([
+                'class'  => '(closure)',
+                'method' => $ref->getName() ?: '{closure}',
+                'file'   => $fnFile,
+                'line'   => $fnLine,
+            ]);
+        }
+
+        try {
+            $ordered = $this->orderArgsForCallable($ref->getParameters(), $args, $request);
+            return $closure(...$ordered);
+        } finally {
+            Callsite::clear();
+        }
     }
 
     private function orderArgsForCallable(array $params, array $available, ?\Ivi\Http\Request $request): array

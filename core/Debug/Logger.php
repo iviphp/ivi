@@ -15,15 +15,37 @@ final class Logger
         'show_payload' => true,
         'show_trace' => true,
         'show_context' => true,
-        'trace_strategy' => 'balanced',     // 'balanced' | 'framework_only' | 'full'
-        'trace_exclude_namespaces' => ['App\\'],
-        'trace_exclude_paths'      => [BASE_PATH . '/src/'],
-        'trace_only_namespaces'    => ['Ivi\\'],
+        // NEW / CHANGE:
+        'trace_strategy' => 'balanced',
+        'trace_exclude_namespaces' => [],
+        'trace_exclude_paths'      => [],   // <– vide, pas de BASE_PATH ici
+        'trace_only_namespaces'    => [],
+        // NEW: namespaces applicatifs (où vivent tes contrôleurs/userland)
+        'app_namespaces'           => ['Ivi\\Controllers\\', 'App\\'],
     ];
 
     public static function configure(array $cfg): void
     {
         self::$config = array_replace(self::$config, $cfg);
+    }
+
+    private static function basePath(): string
+    {
+        static $root = null;
+        if ($root !== null) return $root;
+
+        // Si la constante globale existe, on l'utilise
+        if (\defined('BASE_PATH')) {
+            return $root = \BASE_PATH;
+        }
+
+        // Fallback: on remonte depuis /core/Debug -> / (racine projet)
+        // __DIR__ = .../core/Debug
+        $guess = \realpath(\dirname(__DIR__, 2)); // ../../
+        if ($guess === false) {
+            $guess = \dirname(__DIR__, 2);
+        }
+        return $root = $guess;
     }
 
     /**
@@ -32,38 +54,62 @@ final class Logger
      */
     private static function firstUserAppFrame(array $trace): ?array
     {
-        $skipClasses = ['App\\Controllers\\Controller'];
-        $skipMethods = ['render', 'view', 'capture', 'dotToPath', 'viewsBasePath'];
+        $skipClasses  = []; // on ignore par suffixe \Controller
+        $skipMethods  = ['render', 'view', 'capture', 'dotToPath', 'viewsBasePath'];
+        $appNamespaces = (array)(self::$config['app_namespaces'] ?? ['App\\']);
 
-        // 1) Cherche un vrai frame App\* dans la trace
+        // 1) Cherche un vrai frame App\* (ou Ivi\Controllers\*) dans la trace
         foreach ($trace as $f) {
             $cls  = $f['class']    ?? '';
             $func = $f['function'] ?? '';
             $file = $f['file']     ?? '';
 
-            if ($cls !== '' && str_starts_with($cls, 'App\\')) {
-                if (in_array($cls, $skipClasses, true) && ($func === '' || in_array($func, $skipMethods, true))) {
-                    continue;
+            if ($cls !== '') {
+                $isApp = false;
+                foreach ($appNamespaces as $ns) {
+                    if (str_starts_with($cls, $ns)) {
+                        $isApp = true;
+                        break;
+                    }
                 }
-                return $f; // OK: frame App\ “utile”
+                if ($isApp) {
+                    // ignorer le Controller de base et ses helpers
+                    if ((str_ends_with($cls, '\\Controller') || in_array($cls, $skipClasses, true))
+                        && ($func === '' || in_array($func, $skipMethods, true))
+                    ) {
+                        continue;
+                    }
+                    return $f; // frame utile
+                }
             }
+
+            // fallback: fichier userland sans classe sous /src/
             if ($cls === '' && $file !== '' && str_contains($file, DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR)) {
-                return $f; // frame fichier user sans class (closure)
+                return $f;
             }
         }
 
-        // 2) Fallback: la frame du Router peut contenir l'objet contrôleur + méthode
+        // 2) Fallback: Route::invokeMethod peut porter l'objet contrôleur et la méthode
         foreach ($trace as $f) {
             $cls  = $f['class']    ?? '';
             $func = $f['function'] ?? '';
             if ($cls === 'Ivi\\Router\\Route' && $func === 'invokeMethod') {
                 $args = $f['args'] ?? [];
+
                 // Cas 1: [$controllerObj, 'method']
                 if (isset($args[0], $args[1]) && is_object($args[0]) && is_string($args[1])) {
                     $controllerObj = $args[0];
                     $method        = $args[1];
                     $ctrlClass     = get_class($controllerObj);
-                    if (str_starts_with($ctrlClass, 'App\\')) {
+
+                    $isApp = false;
+                    foreach ($appNamespaces as $ns) {
+                        if (str_starts_with($ctrlClass, $ns)) {
+                            $isApp = true;
+                            break;
+                        }
+                    }
+                    if ($isApp) {
                         try {
                             $rm   = new \ReflectionMethod($ctrlClass, $method);
                             $file = $rm->getFileName() ?: '';
@@ -80,13 +126,21 @@ final class Logger
                         }
                     }
                 }
-                // Cas 2: action sous forme 'App\Controllers\X@method' dans $this->action
-                // parfois passée dans args; on tente de parser une string "Class@method"
+
+                // Cas 2: "Class@method"
                 foreach ($args as $a) {
                     if (is_string($a) && ($pos = strpos($a, '@')) !== false) {
                         $ctrlClass = substr($a, 0, $pos);
                         $method    = substr($a, $pos + 1);
-                        if ($ctrlClass && $method && class_exists($ctrlClass)) {
+
+                        $isApp = false;
+                        foreach ($appNamespaces as $ns) {
+                            if (str_starts_with($ctrlClass, $ns)) {
+                                $isApp = true;
+                                break;
+                            }
+                        }
+                        if ($isApp && $ctrlClass && $method && class_exists($ctrlClass)) {
                             try {
                                 $rm   = new \ReflectionMethod($ctrlClass, $method);
                                 $file = $rm->getFileName() ?: '';
@@ -107,23 +161,29 @@ final class Logger
             }
         }
 
-        // 3) Rien trouvé
         return null;
     }
-
 
     /** Fallback générique : premier frame App\ (peut pointer sur Controller::render) */
     private static function firstAppFrame(array $trace): ?array
     {
+        $appNamespaces = (array)(self::$config['app_namespaces'] ?? ['App\\']);
+
         foreach ($trace as $f) {
             $cls  = $f['class'] ?? '';
             $file = $f['file']  ?? '';
-            if ($cls !== '' && str_starts_with($cls, 'App\\')) return $f;
-            if ($file !== '' && str_contains($file, DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR)) return $f;
+
+            if ($cls !== '') {
+                foreach ($appNamespaces as $ns) {
+                    if (str_starts_with($cls, $ns)) return $f;
+                }
+            }
+            if ($file !== '' && str_contains($file, DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR)) {
+                return $f;
+            }
         }
         return null;
     }
-
 
     // helper interne
     private static function frameIsVisible(array $f): bool
@@ -139,6 +199,18 @@ final class Logger
         foreach (self::$config['trace_exclude_paths'] as $p) {
             if ($file !== '' && str_starts_with($file, $p)) return false;
         }
+
+        // Exclusions par chemin
+        foreach (self::$config['trace_exclude_paths'] as $p) {
+            if ($file !== '') {
+                $fileNorm = str_replace('\\', '/', $file);
+                $pNorm    = rtrim(str_replace('\\', '/', $p), '/');
+                if ($pNorm !== '' && str_starts_with($fileNorm, $pNorm)) {
+                    return false;
+                }
+            }
+        }
+
         // Si on a "only", on garde seulement ces namespaces
         $only = self::$config['trace_only_namespaces'] ?? [];
         if (!empty($only)) {
@@ -156,9 +228,19 @@ final class Logger
 
     private static function cleanFile(string $file): string
     {
-        // Rendre les chemins relatifs et jolis
-        $rel = str_starts_with($file, BASE_PATH) ? substr($file, strlen(BASE_PATH) + 1) : $file;
-        return $rel;
+        if ($file === '') return $file;
+
+        $root = self::basePath();
+
+        // Normaliser pour éviter les surprises
+        $fileNorm = str_replace('\\', '/', $file);
+        $rootNorm = rtrim(str_replace('\\', '/', $root), '/');
+
+        if (str_starts_with($fileNorm, $rootNorm)) {
+            $rel = substr($fileNorm, strlen($rootNorm) + 1);
+            return $rel !== false ? $rel : $file;
+        }
+        return $file;
     }
 
     public static function exception(\Throwable $e, array $context = [], array $options = []): void
@@ -188,40 +270,47 @@ final class Logger
         $muted  = "\033[0;37m";
         $reset  = "\033[0m";
 
-        // Résumé: pointer sur le premier frame App\ si dispo, sinon sur le lieu du throw
-        $appFrameUser = self::firstUserAppFrame($e->getTrace());
-        $appFrame     = $appFrameUser ?: self::firstAppFrame($e->getTrace());
-        $thrownFile   = self::cleanFile($e->getFile());
-        $thrownLine   = (string)$e->getLine();
+        $thrownFile = self::cleanFile($e->getFile());
+        $thrownLine = (string)$e->getLine();
 
-        echo "{$accent}--- ivi.php Debug ---{$reset}\n";
-        if ($appFrame) {
-            $appFile = self::cleanFile($appFrame['file'] ?? '[internal]');
-            $appLine = (string)($appFrame['line'] ?? '-');
+        // <<< priorité au callsite
+        if ($cs = self::callsiteOrNull()) {
+            $appFile = self::cleanFile($cs['file']);
+            $appLine = (string)($cs['line'] ?? '-');
             echo "{$muted}" . get_class($e) . "{$reset}: {$e->getMessage()} ({$appFile}:{$appLine})";
             echo "  (thrown in {$thrownFile}:{$thrownLine})\n\n";
         } else {
             echo "{$muted}" . get_class($e) . "{$reset}: {$e->getMessage()} ({$thrownFile}:{$thrownLine})\n\n";
         }
+        // >>>
+
+        echo "{$accent}--- ivi.php Debug ---{$reset}\n";
 
         if (!empty($cfg['show_trace'])) {
             echo "{$accent}Trace:{$reset}\n";
 
-            // Balanced: garder 1er App\ puis filtrer via frameIsVisible()
-            $all           = $e->getTrace();
-            $frames        = [];
-            $keptFirstApp  = false;
-            foreach ($all as $f) {
-                $cls  = $f['class'] ?? '';
-                if (!$keptFirstApp && $cls !== '' && str_starts_with($cls, 'App\\')) {
-                    $frames[]      = $f;
-                    $keptFirstApp  = true;
-                    continue;
+            $all    = $e->getTrace();
+            $frames = array_values(array_filter($all, [self::class, 'frameIsVisible']));
+
+            // Injecter le callsite comme frame #0 s'il n'est pas déjà là
+            if ($cs = self::callsiteOrNull()) {
+                $already = false;
+                foreach ($frames as $f) {
+                    if (($f['file'] ?? null) === $cs['file'] && ($f['line'] ?? null) === $cs['line']) {
+                        $already = true;
+                        break;
+                    }
                 }
-                if (self::frameIsVisible($f)) {
-                    $frames[] = $f;
+                if (!$already) {
+                    array_unshift($frames, [
+                        'file' => $cs['file'],
+                        'line' => $cs['line'],
+                        'class' => $cs['class'] ?? '',
+                        'function' => $cs['method'] ?? '',
+                    ]);
                 }
             }
+
             $hidden = max(0, count($all) - count($frames));
             $frames = array_slice($frames, 0, (int)($cfg['max_trace'] ?? 10));
 
@@ -230,9 +319,7 @@ final class Logger
                 $line = $f['line'] ?? '-';
                 echo "  #$i $file:$line\n";
             }
-            if ($hidden > 0) {
-                echo "  (+{$hidden} frames masqués)\n";
-            }
+            if ($hidden > 0) echo "  (+{$hidden} frames masqués)\n";
             echo "\n";
         }
 
@@ -240,10 +327,19 @@ final class Logger
             echo "{$accent}Context:{$reset}\n";
             print_r($context);
         }
+    }
 
-        if (!empty($cfg['exit'])) {
-            exit(1);
+
+    private static function callsiteOrNull(): ?array
+    {
+        try {
+            if (class_exists(\Ivi\Core\Debug\Callsite::class)) {
+                $cs = \Ivi\Core\Debug\Callsite::get();
+                if (is_array($cs) && !empty($cs['file'])) return $cs;
+            }
+        } catch (\Throwable $_) {
         }
+        return null;
     }
 
     /* ================= WEB ================= */
@@ -274,19 +370,34 @@ final class Logger
             implode('', array_map(fn($k, $v) => "$k:$v;", array_keys($vars), $vars)) .
             '}';
 
-        // Résumé: “blame” sur le premier frame App\ si dispo
         $trace        = $e->getTrace();
         $appFrameUser = self::firstUserAppFrame($trace);
         $appFrame     = $appFrameUser ?: self::firstAppFrame($trace);
         $thrownFile   = self::cleanFile($e->getFile());
         $thrownLine   = (string)$e->getLine();
 
-        if ($appFrame) {
-            $appFile = self::cleanFile($appFrame['file'] ?? '[internal]');
-            $appLine = (string)($appFrame['line'] ?? '-');
+        if ($cs = self::callsiteOrNull()) {
+            $appFile = self::cleanFile($cs['file']);
+            $appLine = (string)($cs['line'] ?? '-');
             $summary = htmlspecialchars(
                 $e::class . ': ' . $e->getMessage() .
                     ' at ' . $appFile . ':' . $appLine .
+                    '  (thrown in ' . $thrownFile . ':' . $thrownLine . ')',
+                ENT_QUOTES | ENT_SUBSTITUTE,
+                'UTF-8'
+            );
+        } else if ($appFrame) {
+            $appFile = self::cleanFile($appFrame['file'] ?? '');
+            $appLine = (string)($appFrame['line'] ?? '-');
+            $appCls  = (string)($appFrame['class'] ?? '');
+            $appFn   = (string)($appFrame['function'] ?? '');
+            $at      = trim(($appCls !== '' ? $appCls . '::' : '') . ($appFn !== '' ? $appFn : ''));
+            if ($at === '') {
+                $at = $appFile;
+            }
+            $summary = htmlspecialchars(
+                $e::class . ': ' . $e->getMessage() .
+                    ' at ' . $at . ' (' . $appFile . ':' . $appLine . ')' .
                     '  (thrown in ' . $thrownFile . ':' . $thrownLine . ')',
                 ENT_QUOTES | ENT_SUBSTITUTE,
                 'UTF-8'
@@ -299,6 +410,50 @@ final class Logger
                 'UTF-8'
             );
         }
+
+        $traceHtml = '';
+        if (!empty($cfg['show_trace'])) {
+            // On génère les frames filtrées
+            $all = $e->getTrace();
+            $frames = array_values(array_filter($all, [self::class, 'frameIsVisible']));
+
+            // Injecter le callsite en tête
+            if ($cs = self::callsiteOrNull()) {
+                $already = false;
+                foreach ($frames as $f) {
+                    if (($f['file'] ?? null) === $cs['file'] && ($f['line'] ?? null) === $cs['line']) {
+                        $already = true;
+                        break;
+                    }
+                }
+                if (!$already) {
+                    array_unshift($frames, [
+                        'file' => $cs['file'],
+                        'line' => $cs['line'],
+                        'class' => $cs['class'] ?? '',
+                        'function' => $cs['method'] ?? '',
+                    ]);
+                }
+            }
+
+            // Limiter + render simple (même markup que buildTraceHtml)
+            $max = (int)($cfg['max_trace'] ?? 10);
+            $hidden = max(0, count($all) - count($frames));
+            $frames = array_slice($frames, 0, $max);
+
+            $out = '';
+            foreach ($frames as $i => $f) {
+                $file = htmlspecialchars(self::cleanFile($f['file'] ?? '[internal]'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $line = htmlspecialchars((string)($f['line'] ?? '-'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $func = htmlspecialchars((string)($f['function'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+                $out .= "<div class=\"frame\">#$i <span class=\"file\">{$file}</span>:<span class=\"line\">{$line}</span> <span class=\"func\">{$func}()</span></div>";
+            }
+            if ($hidden > 0) {
+                $out = '<div class="frame" style="opacity:.7">(+' . $hidden . ' frames masqués)</div>' . $out;
+            }
+            $traceHtml = $out;
+        }
+
 
         // Trace + Contexte
         $traceHtml   = !empty($cfg['show_trace'])   ? self::buildTraceHtml($e, (int)($cfg['max_trace'] ?? 10)) : '';
@@ -498,18 +653,30 @@ final class Logger
             $frames = array_values(array_filter($all, [self::class, 'frameIsVisible']));
         } else { // balanced
             $keptFirstApp = false;
+            $appNamespaces = (array)(self::$config['app_namespaces'] ?? []);
+
             foreach ($all as $f) {
                 $cls  = $f['class'] ?? '';
                 $file = $f['file'] ?? '';
 
-                // 1) On CONSERVE toujours le premier frame App\ (cause directe)
-                if (!$keptFirstApp && $cls !== '' && str_starts_with($cls, 'App\\')) {
+                // 1) Conserver toujours le premier frame app configuré
+                if (!$keptFirstApp && $cls !== '') {
+                    foreach ($appNamespaces as $ns) {
+                        if (str_starts_with($cls, $ns)) {
+                            $frames[] = $f;
+                            $keptFirstApp = true;
+                            continue 2;
+                        }
+                    }
+                }
+                // 1bis) fallback: premier fichier userland sous /src/
+                if (!$keptFirstApp && $file !== '' && str_contains($file, DIRECTORY_SEPARATOR . 'src' . DIRECTORY_SEPARATOR)) {
                     $frames[] = $f;
                     $keptFirstApp = true;
                     continue;
                 }
 
-                // 2) Ensuite, on filtre selon les règles (on garde surtout Ivi\*)
+                // 2) Puis filtrage normal (Ivi\*, etc.)
                 if (self::frameIsVisible($f)) {
                     $frames[] = $f;
                 }
