@@ -102,7 +102,7 @@ final class App
             \Symfony\Component\VarDumper\VarDumper::setHandler(function ($var): void {
                 \Ivi\Core\Debug\Logger::dump('Dump', $var, [
                     'exit'       => false,   // ne pas couper l’exécution
-                    'show_trace' => true,
+                    'show_trace' => false,
                 ]);
             });
         }

@@ -883,9 +883,95 @@ SVG,
     /** JSON pretty helper (retourne null si non sérialisable proprement) */
     private static function encodePretty(mixed $payload): ?string
     {
+        // Normalisation récursive "lisible"
+        $normalize = function (mixed $v) use (&$normalize) {
+            // Null / scalaire: direct
+            if ($v === null || is_scalar($v)) return $v;
+
+            // Date/heure → ISO 8601
+            if ($v instanceof \DateTimeInterface) {
+                return $v->format(\DateTimeInterface::ATOM);
+            }
+
+            // Traversable → array
+            if ($v instanceof \Traversable) {
+                $tmp = [];
+                foreach ($v as $k => $vv) $tmp[$k] = $normalize($vv);
+                return $tmp;
+            }
+
+            // Objet → essayer toArray/jsonSerialize/public props
+            if (is_object($v)) {
+                // a) toArray()
+                if (method_exists($v, 'toArray')) {
+                    try {
+                        return $normalize($v->toArray());
+                    } catch (\Throwable) {
+                    }
+                }
+                // b) JsonSerializable
+                if ($v instanceof \JsonSerializable) {
+                    try {
+                        return $normalize($v->jsonSerialize());
+                    } catch (\Throwable) {
+                    }
+                }
+                // c) Public props
+                $props = get_object_vars($v); // seulement publics
+                if (!empty($props)) {
+                    $out = [];
+                    foreach ($props as $k => $vv) $out[$k] = $normalize($vv);
+                    return $out;
+                }
+                // d) Fallback: stringable ?
+                if (method_exists($v, '__toString')) {
+                    try {
+                        return (string)$v;
+                    } catch (\Throwable) {
+                    }
+                }
+                // e) Dernier recours: on laisse l'objet tel quel (print_r plus tard)
+                return $v;
+            }
+
+            // Array
+            if (is_array($v)) {
+                $out = [];
+                foreach ($v as $k => $vv) $out[$k] = $normalize($vv);
+                return $out;
+            }
+
+            // Type exotique (ressource…) → string
+            if (is_resource($v)) {
+                return sprintf('resource(%s)', get_resource_type($v));
+            }
+
+            return $v;
+        };
+
+        // 1) Tentative JSON pretty
         try {
-            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-            return ($json === false) ? null : $json;
+            $normalized = $normalize($payload);
+            $json = json_encode(
+                $normalized,
+                JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+            );
+            if ($json !== false) {
+                // Si objet non sérialisable donnait {} ou [] -> forcer fallback texte
+                if (is_object($payload) && ($json === '{}' || $json === '[]')) {
+                    throw new \RuntimeException('Empty JSON for object');
+                }
+                return $json;
+            }
+        } catch (\Throwable) {
+            // ignore → fallback texte
+        }
+
+        // 2) Fallback texte garanti et lisible
+        try {
+            ob_start();
+            print_r($payload);
+            return (string)ob_get_clean();
         } catch (\Throwable) {
             return null;
         }
