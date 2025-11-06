@@ -342,12 +342,11 @@ final class Logger
         return null;
     }
 
-    /* ================= WEB ================= */
-    private static function renderHtmlException(\Throwable $e, array $context, array $cfg): string
+    /** Build theme CSS vars from config */
+    private static function themeCss(array $cfg): string
     {
         $accent = (string)($cfg['accent'] ?? '#008037');
         $theme  = (string)($cfg['theme']  ?? 'light');
-        $title  = 'ivi.php Debug Console';
 
         $light = [
             '--bg'     => '#ffffff',
@@ -366,106 +365,26 @@ final class Logger
             '--code'   => '#122016',
         ];
         $vars = ($theme === 'dark') ? $dark : $light;
-        $root = ':root{--accent:' . $accent . ';' .
+
+        return ':root{--accent:' . $accent . ';' .
             implode('', array_map(fn($k, $v) => "$k:$v;", array_keys($vars), $vars)) .
             '}';
+    }
 
-        $trace        = $e->getTrace();
-        $appFrameUser = self::firstUserAppFrame($trace);
-        $appFrame     = $appFrameUser ?: self::firstAppFrame($trace);
-        $thrownFile   = self::cleanFile($e->getFile());
-        $thrownLine   = (string)$e->getLine();
-
-        if ($cs = self::callsiteOrNull()) {
-            $appFile = self::cleanFile($cs['file']);
-            $appLine = (string)($cs['line'] ?? '-');
-            $summary = htmlspecialchars(
-                $e::class . ': ' . $e->getMessage() .
-                    ' at ' . $appFile . ':' . $appLine .
-                    '  (thrown in ' . $thrownFile . ':' . $thrownLine . ')',
-                ENT_QUOTES | ENT_SUBSTITUTE,
-                'UTF-8'
-            );
-        } else if ($appFrame) {
-            $appFile = self::cleanFile($appFrame['file'] ?? '');
-            $appLine = (string)($appFrame['line'] ?? '-');
-            $appCls  = (string)($appFrame['class'] ?? '');
-            $appFn   = (string)($appFrame['function'] ?? '');
-            $at      = trim(($appCls !== '' ? $appCls . '::' : '') . ($appFn !== '' ? $appFn : ''));
-            if ($at === '') {
-                $at = $appFile;
-            }
-            $summary = htmlspecialchars(
-                $e::class . ': ' . $e->getMessage() .
-                    ' at ' . $at . ' (' . $appFile . ':' . $appLine . ')' .
-                    '  (thrown in ' . $thrownFile . ':' . $thrownLine . ')',
-                ENT_QUOTES | ENT_SUBSTITUTE,
-                'UTF-8'
-            );
-        } else {
-            $summary = htmlspecialchars(
-                $e::class . ': ' . $e->getMessage() .
-                    ' at ' . $thrownFile . ':' . $thrownLine,
-                ENT_QUOTES | ENT_SUBSTITUTE,
-                'UTF-8'
-            );
-        }
-
-        $traceHtml = '';
-        if (!empty($cfg['show_trace'])) {
-            // On génère les frames filtrées
-            $all = $e->getTrace();
-            $frames = array_values(array_filter($all, [self::class, 'frameIsVisible']));
-
-            // Injecter le callsite en tête
-            if ($cs = self::callsiteOrNull()) {
-                $already = false;
-                foreach ($frames as $f) {
-                    if (($f['file'] ?? null) === $cs['file'] && ($f['line'] ?? null) === $cs['line']) {
-                        $already = true;
-                        break;
-                    }
-                }
-                if (!$already) {
-                    array_unshift($frames, [
-                        'file' => $cs['file'],
-                        'line' => $cs['line'],
-                        'class' => $cs['class'] ?? '',
-                        'function' => $cs['method'] ?? '',
-                    ]);
-                }
-            }
-
-            // Limiter + render simple (même markup que buildTraceHtml)
-            $max = (int)($cfg['max_trace'] ?? 10);
-            $hidden = max(0, count($all) - count($frames));
-            $frames = array_slice($frames, 0, $max);
-
-            $out = '';
-            foreach ($frames as $i => $f) {
-                $file = htmlspecialchars(self::cleanFile($f['file'] ?? '[internal]'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-                $line = htmlspecialchars((string)($f['line'] ?? '-'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-                $func = htmlspecialchars((string)($f['function'] ?? ''), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-                $out .= "<div class=\"frame\">#$i <span class=\"file\">{$file}</span>:<span class=\"line\">{$line}</span> <span class=\"func\">{$func}()</span></div>";
-            }
-            if ($hidden > 0) {
-                $out = '<div class="frame" style="opacity:.7">(+' . $hidden . ' frames masqués)</div>' . $out;
-            }
-            $traceHtml = $out;
-        }
-
-
-        // Trace + Contexte
-        $traceHtml   = !empty($cfg['show_trace'])   ? self::buildTraceHtml($e, (int)($cfg['max_trace'] ?? 10)) : '';
-        $contextHtml = !empty($cfg['show_context']) ? self::buildContextHtml($context) : '';
+    /** Wraps content into the shared HTML shell */
+    private static function htmlShell(string $title, string $mainHtml, array $cfg): string
+    {
+        $root = self::themeCss($cfg);
+        $theme = (string)($cfg['theme'] ?? 'light');
 
         ob_start(); ?>
         <!doctype html>
         <html lang="en">
 
         <head>
-            <meta charset="utf-8">
-            <title><?= $title ?></title>
+            <meta charset="utf-8" />
+            <title><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></title>
+            <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon/ivi-192x192.png">
             <style>
                 <?= $root ?>* {
                     box-sizing: border-box
@@ -502,12 +421,6 @@ final class Logger
                     background: #fff;
                     border-radius: 50%;
                     padding: 4px
-                }
-
-                .name {
-                    font-size: 16px;
-                    font-weight: 700;
-                    letter-spacing: .3px
                 }
 
                 .badge {
@@ -550,7 +463,6 @@ final class Logger
                     border-radius: 8px;
                     white-space: pre-wrap;
                     font-size: 13px;
-                    color: var(--fg);
                     margin: 0
                 }
 
@@ -570,10 +482,6 @@ final class Logger
                     font-weight: 700
                 }
 
-                .trace .func {
-                    color: var(--muted)
-                }
-
                 .kv {
                     display: grid;
                     grid-template-columns: 180px 1fr;
@@ -589,43 +497,63 @@ final class Logger
                     padding: 2px 6px;
                     border-radius: 6px
                 }
+
+                .panel .head svg {
+                    vertical-align: -2px;
+                    margin-right: 6px;
+                }
+
+                .name {
+                    font-family: "Segoe UI", Roboto, "SF Pro Display", system-ui, sans-serif;
+                    font-weight: 600;
+                    font-size: 17px;
+                    letter-spacing: 0.4px;
+                    color: #fff;
+                    display: flex;
+                    align-items: baseline;
+                    gap: 4px;
+                }
+
+                .name strong {
+                    font-weight: 700;
+                    font-size: 18px;
+                    background: linear-gradient(90deg, #ffffff 0%, #e7ffee 40%, #b0f8c5 100%);
+                    -webkit-background-clip: text;
+                    -webkit-text-fill-color: transparent;
+                }
+
+                .name .dot {
+                    color: #00a35b;
+                    text-shadow:
+                        0 0 3px rgba(0, 255, 170, 0.8),
+                        0 0 6px rgba(0, 255, 128, 0.5);
+                    font-weight: 900;
+                    margin-left: 1px;
+                    margin-right: 1px;
+                    transform: scale(1.2);
+                }
+
+                .name .subtitle {
+                    font-size: 13px;
+                    font-weight: 500;
+                    opacity: 0.9;
+                    margin-left: 4px;
+                    color: rgba(255, 255, 255, 0.9);
+                    letter-spacing: 0.2px;
+                }
             </style>
         </head>
 
         <body>
             <header>
                 <div class="brand">
-                    <img src="/assets/logo/ivi.png" alt="ivi.php" class="logo">
-                    <span class="name">ivi.php Debug Console</span>
+                    <img src="/assets/logo/ivi.png" alt="Ivi.php" class="logo">
+                    <span class="name"><strong>Ivi<span class="dot">.</span>php</strong> <span class="subtitle">Debug Console</span></span>
                 </div>
                 <span class="badge"><?= htmlspecialchars(strtoupper($theme), ENT_QUOTES, 'UTF-8') ?></span>
             </header>
-
             <main>
-                <section class="panel">
-                    <div class="head">Kernel Exception</div>
-                    <div class="body">
-                        <pre class="code"><?= $summary ?></pre>
-                    </div>
-                </section>
-
-                <?php if (!empty($cfg['show_trace'])): ?>
-                    <section class="panel">
-                        <div class="head"><strong>Stack trace (top <?= (int)($cfg['max_trace'] ?? 10) ?>)</strong></div>
-                        <div class="body trace">
-                            <?= $traceHtml ?>
-                        </div>
-                    </section>
-                <?php endif; ?>
-
-                <?php if (!empty($cfg['show_context'])): ?>
-                    <section class="panel">
-                        <div class="head"><strong>Context</strong></div>
-                        <div class="body">
-                            <?= $contextHtml ?>
-                        </div>
-                    </section>
-                <?php endif; ?>
+                <?= $mainHtml ?>
             </main>
         </body>
 
@@ -633,6 +561,49 @@ final class Logger
 <?php
         return (string)ob_get_clean();
     }
+
+    /** Build a simple trace HTML from a backtrace array */
+    private static function backtraceHtml(array $trace, int $max): string
+    {
+        $trace = array_slice($trace, 0, max(1, $max));
+        $out = '';
+        foreach ($trace as $i => $f) {
+            $file = htmlspecialchars(self::cleanFile($f['file'] ?? '[internal]'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $line = htmlspecialchars((string)($f['line'] ?? '-'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+            $out .= "<div class=\"frame\">#$i <span class=\"file\">{$file}</span>:<span class=\"line\">{$line}</span></div>";
+        }
+        return $out ?: '<div class="frame"><em>No stack frames available.</em></div>';
+    }
+
+    /* ================= WEB ================= */
+    private static function renderHtmlException(\Throwable $e, array $context, array $cfg): string
+    {
+        $title = 'ivi.php Debug Console';
+
+        // --- Summary (inchangé de ton code, raccourci ici)
+        $thrownFile = self::cleanFile($e->getFile());
+        $thrownLine = (string)$e->getLine();
+        $summary = htmlspecialchars($e::class . ': ' . $e->getMessage() . ' at ' . $thrownFile . ':' . $thrownLine, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+        // --- Trace
+        $traceHtml = '';
+        if (!empty($cfg['show_trace'])) {
+            // filtre & limite comme tu le faisais (ou simple backtraceToHtml)
+            $traceHtml = self::buildTraceHtml($e, (int)($cfg['max_trace'] ?? 10));
+            $traceHtml = '<div class="trace">' . $traceHtml . '</div>';
+        }
+
+        // --- Contexte
+        $contextHtml = !empty($cfg['show_context']) ? self::buildContextHtml($context) : '';
+
+        // --- Assemble panels
+        $main  = self::panel('Kernel Exception', '<pre class="code">' . $summary . '</pre>');
+        if ($traceHtml !== '')  $main .= self::panel('Stack trace (top ' . (int)($cfg['max_trace'] ?? 10) . ')', $traceHtml);
+        if ($contextHtml !== '') $main .= self::panel('Context', $contextHtml);
+
+        return self::htmlShell($title, $main, $cfg);
+    }
+
 
 
     /**
@@ -736,5 +707,165 @@ final class Logger
         $safe = htmlspecialchars($json, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
         return '<pre class="code">' . $safe . '</pre>';
+    }
+
+    private static function titleForCli(string $title): string
+    {
+        // Supprime le HTML/SVG éventuel
+        $plain = trim(strip_tags($title));
+        // Si le titre reste vide (ex: que du SVG), on met un fallback
+        return $plain !== '' ? $plain : '[log]';
+    }
+
+    /** Dumper générique (titre + payload) en CLI ou HTML */
+    public static function dump(string $title, mixed $payload = null, array $options = []): void
+    {
+        $cfg = array_replace(self::$config, $options);
+
+        // ================= CLI =================
+        if (PHP_SAPI === 'cli') {
+            $accent = "\033[38;5;34m";
+            $muted  = "\033[0;37m";
+            $reset  = "\033[0m";
+
+            // IMPORTANT: en CLI, on retire le SVG/HTML
+            $titleCli = self::titleForCli($title);
+
+            $json = self::encodePretty($payload);
+
+            echo "{$accent}{$titleCli}{$reset}\n";
+            if ($json !== null) {
+                echo $json . "\n";
+            } else {
+                print_r($payload);
+                echo "\n";
+            }
+
+            if (!empty($cfg['show_trace'])) {
+                echo "{$muted}Trace:{$reset}\n";
+                echo strip_tags(self::backtraceHtml(
+                    debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS),
+                    (int)($cfg['max_trace'] ?? 10)
+                )) . "\n";
+            }
+            if (!empty($cfg['exit'])) exit(0);
+            return;
+        }
+
+        // ================= WEB (HTML) =================
+        if (!headers_sent()) {
+            header('Content-Type: text/html; charset=utf-8');
+        }
+
+        $json = self::encodePretty($payload);
+        $safe = $json !== null
+            ? htmlspecialchars($json, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8')
+            : htmlspecialchars(var_export($payload, true), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+        // Si on a un titre qui contient du SVG/HTML, on passe title_is_html=true
+        $headIsHtml = (bool)($cfg['title_is_html'] ?? false);
+
+        // 1) Panel principal
+        $main  = self::panel($title, '<pre class="code">' . $safe . '</pre>', $headIsHtml);
+
+        // 2) Panel trace optionnel
+        if (!empty($cfg['show_trace'])) {
+            $traceHtml = self::backtraceHtml(
+                debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS),
+                (int)($cfg['max_trace'] ?? 10)
+            );
+            $main .= self::panel('Trace', '<div class="trace">' . $traceHtml . '</div>');
+        }
+
+        echo self::htmlShell('ivi.php dump', $main, $cfg);
+        if (!empty($cfg['exit'])) exit(0);
+    }
+
+    /** Raccourcis de niveau */
+    public static function info(string $message, array $context = [], array $options = []): void
+    {
+        $icon = self::iconSvg('info');
+        self::dump(self::titleWithIcon($icon, $message), $context, $options + ['title_is_html' => true]);
+    }
+    public static function debug(string $message, array $context = [], array $options = []): void
+    {
+        $icon = self::iconSvg('bug');
+        self::dump(self::titleWithIcon($icon, $message), $context, $options + ['title_is_html' => true]);
+    }
+    public static function error(string $message, array $context = [], array $options = []): void
+    {
+        $icon = self::iconSvg('error');
+        self::dump(self::titleWithIcon($icon, $message), $context, $options + ['title_is_html' => true]);
+    }
+
+    /**
+     * Renvoie un petit SVG inline (taille 16x16) selon le type demandé.
+     * @param string $type 'info' | 'bug' | 'error'
+     */
+    private static function iconSvg(string $type): string
+    {
+        return match ($type) {
+            'info' => <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" 
+     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" 
+     stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="16" x2="12" y2="12"></line>
+    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+</svg>
+SVG,
+            'bug' => <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" 
+     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" 
+     stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">
+    <path d="M19 7l-3 2"></path><path d="M5 7l3 2"></path>
+    <path d="M12 20a7 7 0 0 0 7-7H5a7 7 0 0 0 7 7z"></path>
+    <path d="M12 4a4 4 0 0 1 4 4v1H8V8a4 4 0 0 1 4-4z"></path>
+</svg>
+SVG,
+            'error' => <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+     viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="15" y1="9" x2="9" y2="15"></line>
+    <line x1="9" y1="9" x2="15" y2="15"></line>
+</svg>
+SVG,
+            default => '',
+        };
+    }
+
+    // 1) Helper: titre = SVG brut + message échappé
+    private static function titleWithIcon(string $iconSvg, string $message): string
+    {
+        $msg = htmlspecialchars($message, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        // le SVG est "trusted", on ne l’échappe pas
+        return $iconSvg . ' ' . $msg;
+    }
+
+    // 2) Panel commun avec option HTML pour la tête
+    private static function panel(string $head, string $bodyHtml, bool $headIsHtml = false): string
+    {
+        $headHtml = $headIsHtml
+            ? $head
+            : htmlspecialchars($head, ENT_QUOTES, 'UTF-8');
+
+        return '<section class="panel">'
+            .   '<div class="head">' . $headHtml . '</div>'
+            .   '<div class="body">' . $bodyHtml . '</div>'
+            . '</section>';
+    }
+
+
+    /** JSON pretty helper (retourne null si non sérialisable proprement) */
+    private static function encodePretty(mixed $payload): ?string
+    {
+        try {
+            $json = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            return ($json === false) ? null : $json;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

@@ -37,9 +37,8 @@ final class Loader
 
     private static function configureCloudinary(): void
     {
-        // Configure seulement si le package est installé
         if (!class_exists(\Cloudinary\Configuration\Configuration::class)) {
-            return; // silencieux si non présent
+            return;
         }
 
         $cloud = [
