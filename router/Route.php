@@ -51,6 +51,13 @@ final class Route
         $this->compile();
     }
 
+    public function patternMatches(string $path): bool
+    {
+        $raw = parse_url($path, PHP_URL_PATH) ?: '/';
+        $url = '/' . ltrim($raw, '/');
+        return (bool)preg_match($this->compiledPattern, $url);
+    }
+
     // -----------------------------
     // Fluent configuration
     // -----------------------------
@@ -233,30 +240,88 @@ final class Route
         foreach ($params as $param) {
             $name = $param->getName();
 
-            // 🔌 Injection par type: Ivi\Http\Request
-            if ($param->hasType()) {
-                $type = (string)$param->getType();
-                if ($type === \Ivi\Http\Request::class || $type === '\\' . \Ivi\Http\Request::class) {
+            // Injection Request
+            $ptype = $param->getType();
+            if ($ptype instanceof \ReflectionNamedType) {
+                $tname = ltrim($ptype->getName(), '\\');
+                if ($tname === \Ivi\Http\Request::class) {
                     $ordered[] = $request;
                     continue;
                 }
             }
 
-            if (array_key_exists($name, $available)) {
-                $value = $available[$name];
-                if ($param->hasType()) {
-                    $value = $this->coerceType($value, (string)$param->getType(), $name);
-                }
-                $ordered[] = $value;
-            } elseif ($param->isDefaultValueAvailable()) {
-                $ordered[] = $param->getDefaultValue();
-            } else {
-                $ordered[] = null;
-            }
+            $value = $available[$name] ?? ($param->isDefaultValueAvailable() ? $param->getDefaultValue() : null);
+            $ordered[] = $this->coerceForParam($param, $value);
         }
         return $ordered;
     }
 
+    private function coerceForParam(\ReflectionParameter $param, mixed $value): mixed
+    {
+        $type = $param->getType();
+
+        // Null autorisé ?
+        if ($value === null) {
+            return null;
+        }
+
+        if ($type instanceof \ReflectionNamedType) {
+            return $this->coerceNamedType($type, $value, $param->getName());
+        }
+
+        if ($type instanceof \ReflectionUnionType) {
+            // si une des branches est "int", "float", "bool", "string", on essaie dans cet ordre
+            foreach ($type->getTypes() as $branch) {
+                if (!$branch instanceof \ReflectionNamedType) continue;
+                $n = strtolower($branch->getName());
+                if (in_array($n, ['int', 'float', 'bool', 'string'], true)) {
+                    try {
+                        return $this->coerceNamedType($branch, $value, $param->getName());
+                    } catch (\Throwable) { /* essayer autre branche */
+                    }
+                }
+            }
+            // sinon, on laisse tel quel
+            return $value;
+        }
+
+        return $value;
+    }
+
+    private function coerceNamedType(\ReflectionNamedType $type, mixed $value, string $name): mixed
+    {
+        $n = strtolower($type->getName());
+        return match ($n) {
+            'int'    => $this->filterInt($value, $name),
+            'float'  => $this->filterFloat($value, $name),
+            'bool'   => $this->filterBool($value, $name),
+            'string' => (string)$value,
+            default  => $value, // classes/array: on laisse tel quel
+        };
+    }
+
+    private function filterInt(mixed $v, string $name): int
+    {
+        if (filter_var($v, FILTER_VALIDATE_INT) === false) {
+            throw new \InvalidArgumentException("Parameter '$name' must be an integer.");
+        }
+        return (int)$v;
+    }
+    private function filterFloat(mixed $v, string $name): float
+    {
+        if (filter_var($v, FILTER_VALIDATE_FLOAT) === false) {
+            throw new \InvalidArgumentException("Parameter '$name' must be a float.");
+        }
+        return (float)$v;
+    }
+    private function filterBool(mixed $v, string $name): bool
+    {
+        if (is_bool($v)) return $v;
+        $norm = strtolower((string)$v);
+        if (in_array($norm, ['1', 'true', 'on', 'yes'], true)) return true;
+        if (in_array($norm, ['0', 'false', 'off', 'no'], true)) return false;
+        throw new \InvalidArgumentException("Parameter '$name' must be a boolean.");
+    }
 
     // -----------------------------
     // Accessors
@@ -289,34 +354,54 @@ final class Route
 
     private function compile(): self
     {
-        // collect param names ":id" → ["id", ...]
-        preg_match_all('#:([\w]+)\??#', $this->path, $m);
+        // 0) Normalise le chemin (garde "/" si racine)
+        $rawPath = '/' . trim($this->path, '/');
+
+        // 1) Supporte {param} et {param:regex} (et option ?)
+        //    → convertit en syntaxe native :param / :param?
+        //    et stocke les regex inline dans $this->wheres
+        $rawPath = preg_replace_callback(
+            '/\{(\w+)(?::([^}]+))?(\?)?\}/',
+            function ($m) {
+                $name     = $m[1];
+                $inlineRx = $m[2] ?? null;
+                $optional = (($m[3] ?? '') === '?');
+
+                if ($inlineRx) {
+                    $this->wheres[$name] = $inlineRx;
+                }
+                return $optional ? ":{$name}?" : ":{$name}";
+            },
+            $rawPath
+        );
+
+        // 2) Collecte des noms de paramètres en syntaxe native
+        preg_match_all('#:([\w]+)\??#', $rawPath, $m);
         $this->paramNames = $m[1] ?? [];
 
-        // replace each param with either custom regex or a safe default
+        // 3) Construit le regex final à partir des :param / :param?
         $regex = preg_replace_callback(
             '#:([\w]+)(\?)?#',
             function ($matches) {
-                $name = $matches[1];
-                $optional = $matches[2] === '?';
-                $base = $this->wheres[$name] ?? '[^/]+';
+                $name     = $matches[1];
+                $optional = (($matches[2] ?? '') === '?');
+                $base     = $this->wheres[$name] ?? '[^/]+';
 
-                // optional segment must include its preceding slash
-                $segment = "(?P<$name>$base)";
-                return $optional ? "(?:/$segment)?" : "/$segment";
+                $segment = "(?P<{$name}>{$base})";
+                // ⬇️ FIX: ne pas ajouter un "/" ici car il est déjà dans le chemin source "/users/:id"
+                return $optional ? "(?:/{$segment})?" : "{$segment}";
+                // avant: return $optional ? "(?:/{$segment})?" : "/{$segment}";
             },
-            '/' . trim($this->path, '/')
+            $rawPath
         );
-
-        // Allow root path special-case
-        if ($regex === '/') {
-            $this->compiledPattern = '#^/$#';
-        } else {
-            $this->compiledPattern = '#^' . $regex . '$#';
-        }
+        // 4) Cas spécial racine
+        $this->compiledPattern = ($regex === '/')
+            ? '#^/$#'
+            : '#^' . $regex . '$#';
 
         return $this;
     }
+
 
     private function sanitizePathValue(?string $value): ?string
     {

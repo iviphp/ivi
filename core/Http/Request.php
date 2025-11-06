@@ -59,8 +59,33 @@ final class Request
     }
     public function path(): string
     {
-        return $this->path;
+        $uri  = $_SERVER['REQUEST_URI']    ?? '/';
+        $path = parse_url($uri, PHP_URL_PATH) ?? '/';
+
+        // Normalise séparateurs
+        $scriptName = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+        $baseDir    = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
+
+        // Supprime base path si l’app est sous un sous-dossier
+        if ($baseDir !== '' && $baseDir !== '/' && str_starts_with($path, $baseDir)) {
+            $path = substr($path, strlen($baseDir));
+        }
+
+        // Enlève /index.php
+        if ($path === '/index.php') {
+            $path = '/';
+        }
+
+        // Supprime le slash final (sauf racine) pour éviter les doublons
+        if ($path !== '/' && str_ends_with($path, '/')) {
+            $path = rtrim($path, '/');
+        }
+
+        if ($path === '') $path = '/';
+        return $path;
     }
+
+
     public function query(): array
     {
         return $this->query;
