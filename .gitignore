@@ -1,29 +1,38 @@
+# =====================================================
+# 🧱 ivi.php Framework – Git Ignore Rules
+# =====================================================
+
 cmd.md
 .vscode/
 .git/
 public/images/
 public/vendor/
 public/.well-known/
-.env
-.env.local
-.env.staging
-.env.production
 request.log
-# OS
+
+# =====================================================
+# 🧩 OS
+# =====================================================
 .DS_Store
 Thumbs.db
 
-# Editors / IDE
+# =====================================================
+# 🧰 Editors / IDE
+# =====================================================
 .idea/
 .vscode/
 *.swp
 
-# PHP
+# =====================================================
+# 🐘 PHP / Composer
+# =====================================================
 vendor/
 composer.phar
-# (Garde composer.lock versionné si c’est une app; ne pas l’ignorer)
+# Garder composer.lock versionné (important pour reproductibilité)
 
-# Logs / Cache / Tests
+# =====================================================
+# 🧾 Logs / Cache / Tests
+# =====================================================
 *.log
 logs/
 storage/
@@ -32,9 +41,16 @@ tmp/
 coverage/
 .phpunit.result.cache
 
-# Env & Secrets
+# =====================================================
+# 🔐 Environment & Secrets
+# =====================================================
 .env
-.env.*
+.env.local
+.env.staging
+.env.production
+.env.*          # ignore tous les autres .env custom
+!*.env.example   # <— ✅ conserve .env.example dans le repo
+
 *.pem
 *.key
 *.p12
@@ -43,10 +59,14 @@ coverage/
 *.crt
 *.der
 
-# Reports
+# =====================================================
+# 📊 Reports
+# =====================================================
 gitleaks-report.json
 
-# Node / Front
+# =====================================================
+# 🌐 Frontend / Node / Build
+# =====================================================
 node_modules/
 dist/
 build/
