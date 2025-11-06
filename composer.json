@@ -12,6 +12,9 @@
       "Ivi\\Router\\": "router/",
       "App\\": "src/"
     },
+    "bin": [
+      "bin/ivi"
+    ],
     "files": [
       "support/helpers.php"
     ]

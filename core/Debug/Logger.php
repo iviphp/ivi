@@ -7,6 +7,7 @@ final class Logger
     /** @var array<string,mixed> */
     private static array $config = [
         'theme' => 'light',
+        // accent par défaut (Ivi)
         'accent' => '#008037',
         'max_trace' => 10,
         'exit' => true,
@@ -15,18 +16,74 @@ final class Logger
         'show_payload' => true,
         'show_trace' => true,
         'show_context' => true,
-        // NEW / CHANGE:
+
+        // ====== NEW: branding ======
+        // 'brand' = 'ivi' | 'softadastra'
+        'brand'       => 'ivi',
+        'brand_name'  => 'Ivi.php',
+        'brand_logo'  => '/assets/logo/ivi.png',   // remplace si besoin
+        // ===========================
+
+        // Trace
         'trace_strategy' => 'balanced',
         'trace_exclude_namespaces' => [],
-        'trace_exclude_paths'      => [],   // <– vide, pas de BASE_PATH ici
+        'trace_exclude_paths'      => [],
         'trace_only_namespaces'    => [],
-        // NEW: namespaces applicatifs (où vivent tes contrôleurs/userland)
         'app_namespaces'           => ['Ivi\\Controllers\\', 'App\\'],
     ];
 
+    /** Presets de marque */
+    private const BRAND_PRESETS = [
+        'ivi' => [
+            'brand_name' => 'Ivi.php',
+            'accent'     => '#008037',
+            'brand_logo' => '/assets/logo/ivi.png',
+            'title'      => 'ivi.php Debug Console',
+        ],
+        'softadastra' => [
+            'brand_name' => 'Softadastra',
+            'accent'     => '#ff9900',
+            'brand_logo' => '/assets/logo/ivi.png',
+            'title'      => 'Softadastra Debug Console',
+        ],
+    ];
+
+    /** Merge config + applique preset de marque */
     public static function configure(array $cfg): void
     {
         self::$config = array_replace(self::$config, $cfg);
+        self::applyBrand();
+    }
+
+    /** NEW: permet de changer rapidement de marque */
+    public static function configureBrand(string $brand, ?string $accent = null, ?string $logo = null): void
+    {
+        self::$config['brand'] = $brand;
+        if ($accent !== null) self::$config['accent'] = $accent;
+        if ($logo !== null)   self::$config['brand_logo'] = $logo;
+        self::applyBrand();
+    }
+
+    private static function applyBrand(): void
+    {
+        $brand = strtolower((string)(self::$config['brand'] ?? 'ivi'));
+        $preset = self::BRAND_PRESETS[$brand] ?? self::BRAND_PRESETS['ivi'];
+
+        // Accent: priorité à l'override utilisateur
+        if (empty(self::$config['accent'])) {
+            self::$config['accent'] = $preset['accent'];
+        }
+        // Nom & logo: on set si non fournis
+        if (empty(self::$config['brand_name'])) {
+            self::$config['brand_name'] = $preset['brand_name'];
+        }
+        if (empty(self::$config['brand_logo'])) {
+            self::$config['brand_logo'] = $preset['brand_logo'];
+        }
+        // Titre par défaut pour la page HTML
+        if (empty(self::$config['page_title'])) {
+            self::$config['page_title'] = $preset['title'];
+        }
     }
 
     private static function basePath(): string
@@ -345,7 +402,7 @@ final class Logger
     /** Build theme CSS vars from config */
     private static function themeCss(array $cfg): string
     {
-        $accent = (string)($cfg['accent'] ?? '#008037');
+        $accent = (string)($cfg['accent'] ?? '#008037'); // vert par défaut
         $theme  = (string)($cfg['theme']  ?? 'light');
 
         $light = [
@@ -354,7 +411,7 @@ final class Logger
             '--muted'  => '#555555',
             '--panel'  => '#ffffff',
             '--border' => '#e5e7eb',
-            '--code'   => '#f8fff9',
+            '--code'   => '#fff8f0', // légèrement chaud, va bien avec #ff9900
         ];
         $dark = [
             '--bg'     => '#0f1115',
@@ -362,7 +419,7 @@ final class Logger
             '--muted'  => '#9aa4ad',
             '--panel'  => '#0f141a',
             '--border' => '#1f252c',
-            '--code'   => '#122016',
+            '--code'   => '#19140e', // chaud sombre pour #ff9900
         ];
         $vars = ($theme === 'dark') ? $dark : $light;
 
@@ -374,8 +431,13 @@ final class Logger
     /** Wraps content into the shared HTML shell */
     private static function htmlShell(string $title, string $mainHtml, array $cfg): string
     {
-        $root = self::themeCss($cfg);
+        $root  = self::themeCss($cfg);
         $theme = (string)($cfg['theme'] ?? 'light');
+
+        // NEW: branding dynamiques
+        $brandName = (string)($cfg['brand_name'] ?? 'Ivi.php');
+        $brandLogo = (string)($cfg['brand_logo'] ?? '/assets/logo/ivi.png');
+        $pageTitle = (string)($cfg['page_title'] ?? $title);
 
         ob_start(); ?>
         <!doctype html>
@@ -383,8 +445,8 @@ final class Logger
 
         <head>
             <meta charset="utf-8" />
-            <title><?= htmlspecialchars($title, ENT_QUOTES, 'UTF-8') ?></title>
-            <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon/ivi-192x192.png">
+            <title><?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></title>
+            <link rel="icon" type="image/png" sizes="32x32" href="<?= htmlspecialchars($brandLogo, ENT_QUOTES, 'UTF-8') ?>">
             <style>
                 <?= $root ?>* {
                     box-sizing: border-box
@@ -417,7 +479,6 @@ final class Logger
                     height: 26px;
                     width: auto;
                     vertical-align: middle;
-                    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .15));
                     background: #fff;
                     border-radius: 50%;
                     padding: 4px
@@ -482,64 +543,27 @@ final class Logger
                     font-weight: 700
                 }
 
-                .kv {
-                    display: grid;
-                    grid-template-columns: 180px 1fr;
-                    gap: 8px
-                }
-
-                .kv .k {
-                    color: var(--muted)
-                }
-
-                .kv .v code {
-                    background: var(--code);
-                    padding: 2px 6px;
-                    border-radius: 6px
-                }
-
-                .panel .head svg {
-                    vertical-align: -2px;
-                    margin-right: 6px;
-                }
-
                 .name {
                     font-family: "Segoe UI", Roboto, "SF Pro Display", system-ui, sans-serif;
                     font-weight: 600;
                     font-size: 17px;
-                    letter-spacing: 0.4px;
+                    letter-spacing: .4px;
                     color: #fff;
                     display: flex;
                     align-items: baseline;
-                    gap: 4px;
+                    gap: 6px
                 }
 
                 .name strong {
-                    font-weight: 700;
-                    font-size: 18px;
-                    background: linear-gradient(90deg, #ffffff 0%, #e7ffee 40%, #b0f8c5 100%);
-                    -webkit-background-clip: text;
-                    -webkit-text-fill-color: transparent;
+                    font-weight: 800
                 }
 
-                .name .dot {
-                    color: #00a35b;
-                    text-shadow:
-                        0 0 3px rgba(0, 255, 170, 0.8),
-                        0 0 6px rgba(0, 255, 128, 0.5);
-                    font-weight: 900;
-                    margin-left: 1px;
-                    margin-right: 1px;
-                    transform: scale(1.2);
-                }
-
-                .name .subtitle {
+                .subtitle {
                     font-size: 13px;
                     font-weight: 500;
-                    opacity: 0.9;
+                    opacity: .95;
                     margin-left: 4px;
-                    color: rgba(255, 255, 255, 0.9);
-                    letter-spacing: 0.2px;
+                    letter-spacing: .2px
                 }
             </style>
         </head>
@@ -547,14 +571,12 @@ final class Logger
         <body>
             <header>
                 <div class="brand">
-                    <img src="/assets/logo/ivi.png" alt="Ivi.php" class="logo">
-                    <span class="name"><strong>Ivi<span class="dot">.</span>php</strong> <span class="subtitle">Debug Console</span></span>
+                    <img src="<?= htmlspecialchars($brandLogo, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($brandName, ENT_QUOTES, 'UTF-8') ?>" class="logo">
+                    <span class="name"><strong><?= htmlspecialchars($brandName, ENT_QUOTES, 'UTF-8') ?></strong> <span class="subtitle">Debug Console</span></span>
                 </div>
                 <span class="badge"><?= htmlspecialchars(strtoupper($theme), ENT_QUOTES, 'UTF-8') ?></span>
             </header>
-            <main>
-                <?= $mainHtml ?>
-            </main>
+            <main><?= $mainHtml ?></main>
         </body>
 
         </html>
