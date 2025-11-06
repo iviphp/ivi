@@ -6,9 +6,22 @@ namespace App\Models;
 
 use Ivi\Core\ORM\Model;
 
-final class User extends Model
+class User extends Model
 {
     protected static ?string $table = 'users';
-    protected static string $primaryKey = 'id';
-    protected static array $fillable = ['name', 'email', 'password', 'created_at', 'updated_at'];
+    protected static array $fillable = ['id', 'name', 'email', 'password', 'active'];
+
+    /** @return static[] */
+    public static function active(): array
+    {
+        return static::hydrateMany(
+            static::query()->where('active = ?', 1)->get()
+        );
+    }
+
+    public static function byEmail(string $email): ?static
+    {
+        $row = static::query()->where('email = ?', $email)->first();
+        return $row ? new static($row) : null;
+    }
 }

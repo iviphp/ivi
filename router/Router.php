@@ -68,34 +68,65 @@ final class Router
 
     public function dispatch(Request $request): mixed
     {
-        $method = $request->method();
+        $method = strtoupper($request->method());
         $path   = $request->path();
 
-        if (!isset($this->routes[$method])) {
-            throw new RuntimeException("HTTP method not supported: $method");
-        }
+        // HEAD → tenter GET si pas de handler HEAD explicite
+        $tryMethods = ($method === 'HEAD') ? ['HEAD', 'GET'] : [$method];
 
-        foreach ($this->routes[$method] as $route) {
-            if ($route->matches($method, $path)) {
-                try {
-                    return $route->execute(
-                        resolver: $this->resolver,
-                        queryParams: $request->query(),
-                        bodyParams: $this->parseBody($request),
-                        request: $request
-                    );
-                } finally {
-                    // filet de sécurité (optionnel)
-                    Callsite::clear();
+        foreach ($tryMethods as $m) {
+            if (!isset($this->routes[$m])) continue;
+
+            foreach ($this->routes[$m] as $route) {
+                if ($route->matches($m, $path)) {
+                    try {
+                        return $route->execute(
+                            resolver: $this->resolver,
+                            queryParams: $request->query(),
+                            bodyParams: $this->parseBody($request),
+                            request: $request
+                        );
+                    } finally {
+                        \Ivi\Core\Debug\Callsite::clear();
+                    }
                 }
             }
         }
 
+        // 405 si le pattern existe avec d’autres méthodes
         $allowed = $this->allowedMethodsForPath($path, $method);
         if (!empty($allowed)) {
-            throw new MethodNotAllowedHttpException($allowed);
+            throw new \Ivi\Http\Exceptions\MethodNotAllowedHttpException($allowed);
         }
-        throw new NotFoundHttpException('Route not found.');
+
+        // 🔎 DEBUG context avant 404 — (retirables ensuite)
+        \Ivi\Core\Debug\Logger::dump('Router debug', [
+            'method'   => $method,
+            'path'     => $path,
+            'routes'   => array_map(
+                fn($kv) => [$kv[0], array_map(fn($r) => $r->getPath(), $kv[1])],
+                array_map(null, array_keys($this->routes), array_values($this->routes))
+            ),
+        ], ['exit' => false, 'show_trace' => false]);
+
+        throw new \Ivi\Http\Exceptions\NotFoundHttpException('Route not found.');
+    }
+
+    private function allowedMethodsForPath(string $path, string $currentMethod): array
+    {
+        $allowed = [];
+        foreach ($this->routes as $m => $list) {
+            foreach ($list as $route) {
+                if ($route->patternMatches($path)) {
+                    foreach ($route->getMethods() as $rm) {
+                        if ($rm !== $currentMethod) $allowed[] = $rm;
+                    }
+                }
+            }
+        }
+        $allowed = array_values(array_unique($allowed));
+        sort($allowed);
+        return $allowed;
     }
 
 
@@ -111,35 +142,5 @@ final class Router
         }
         // TODO: multipart/form-data -> $request->files()
         return [];
-    }
-
-    /**
-     * Retourne la liste des méthodes autorisées pour ce chemin.
-     * @return string[] ex: ['GET','POST']
-     */
-    private function allowedMethodsForPath(string $path, string $currentMethod): array
-    {
-        $allowed = [];
-        foreach ($this->routes as $m => $list) {
-            if ($m === $currentMethod) continue;
-            foreach ($list as $route) {
-                // on utilise matches() en “ignorant” la méthode en dur: Route::matches vérifie pattern + méthode
-                // donc on check le pattern en le spoofant: si le pattern du route matche le path indépendamment,
-                // il faut que Route::matches dispose d’un test du pattern séparé.
-                //
-                // Si ton Route::matches() est strict (méthode + pattern), on peut ajouter un helper sur Route:
-                //   - $route->patternMatches($path) qui ignore la méthode.
-                //
-                // Si tu n'as pas ce helper, une solution simple:
-                if ($route->matches($m, $path)) {
-                    $allowed[] = $m;
-                }
-            }
-        }
-
-        // déduplique et tri
-        $allowed = array_values(array_unique($allowed));
-        sort($allowed);
-        return $allowed;
     }
 }

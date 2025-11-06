@@ -75,6 +75,47 @@ $app->router->post('/echo', fn(Request $req) => [
 $app->run();
 ```
 
+```php
+use Ivi\Core\ORM\QueryBuilder;
+
+// Tous les users actifs, limit 20, tri récents
+$rows = QueryBuilder::table('users')
+    ->select('id', 'name', 'email', 'created_at')
+    ->where('active = ?', 1)
+    ->orderBy('id DESC')
+    ->limit(20)
+    ->get();
+
+// Un seul résultat
+$user = QueryBuilder::table('users')
+    ->where('email = ?', $email)
+    ->first();
+
+// Requête avec plusieurs conditions AND
+$rows = QueryBuilder::table('orders')
+    ->where('status = ?', 'paid')
+    ->where('amount >= ?', 10000)
+    ->where('created_at >= ?', '2025-01-01')
+    ->get();
+
+// IN + LIKE
+$rows = QueryBuilder::table('users')
+    ->whereIn('role', ['admin','editor'])
+    ->whereLike('name', '%gas%')
+    ->orderBy('id DESC')
+    ->get();
+
+// OR
+$rows = QueryBuilder::table('users')
+    ->where('active = ?', 1)
+    ->orWhere('email LIKE ?', '%@softadastra.com')
+    ->get();
+
+// COUNT pour la pagination
+$total = QueryBuilder::table('users')->where('active = ?', 1)->count();
+
+```
+
 ---
 
 ## 🎨 With View Rendering

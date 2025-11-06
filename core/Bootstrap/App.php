@@ -155,6 +155,13 @@ final class App
         if (is_file($routesFile)) {
             /** @var \Ivi\Router\Router $router */
             $router = $this->router;
+            // $routesFile = $this->baseDir . '/config/routes.php';
+            // \Ivi\Core\Debug\Logger::dump('Including routes file', [
+            //     'routesFile' => $routesFile,
+            //     'exists'     => is_file($routesFile),
+            // ], ['exit' => false, 'show_trace' => false]);
+
+            // $router = $this->router;
             require $routesFile;
             return;
         }

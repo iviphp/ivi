@@ -129,4 +129,67 @@ final class QueryBuilder
         if (!$this->wheres) return '';
         return ' WHERE ' . implode(' AND ', $this->wheres);
     }
+
+    // OR
+    public function orWhere(string $expr, mixed $value = null): self
+    {
+        if (empty($this->wheres)) {
+            return $this->where($expr, $value);
+        }
+        $placeholder = null;
+        if ($value !== null) {
+            $placeholder = ':w' . (count($this->bindings) + 1);
+            $expr = str_replace('?', $placeholder, $expr);
+            $this->bindings[$placeholder] = $value;
+        }
+        // wrap dernier bloc en (...) OR expr
+        $last = array_pop($this->wheres);
+        $this->wheres[] = '(' . $last . ') OR ' . $expr;
+        return $this;
+    }
+
+    // IN
+    public function whereIn(string $column, array $values): self
+    {
+        if ($values === []) {
+            $this->wheres[] = '1=0';
+            return $this;
+        } // IN () -> false
+        $placeholders = [];
+        foreach ($values as $v) {
+            $ph = ':w' . (count($this->bindings) + 1);
+            $this->bindings[$ph] = $v;
+            $placeholders[] = $ph;
+        }
+        $this->wheres[] = $column . ' IN (' . implode(',', $placeholders) . ')';
+        return $this;
+    }
+
+    // LIKE
+    public function whereLike(string $column, string $pattern): self
+    {
+        $ph = ':w' . (count($this->bindings) + 1);
+        $this->bindings[$ph] = $pattern;
+        $this->wheres[] = $column . ' LIKE ' . $ph;
+        return $this;
+    }
+
+    // COUNT
+    public function count(): int
+    {
+        $sql = 'SELECT COUNT(*) AS c FROM ' . $this->table . $this->compileWhere();
+        $stmt = $this->pdo->prepare($sql);
+        foreach ($this->bindings as $k => $v) $stmt->bindValue($k, $v);
+        $stmt->execute();
+        return (int)($stmt->fetchColumn() ?: 0);
+    }
+
+    // (optionnel) RAW – à n’utiliser que quand nécessaire
+    public function raw(string $sql, array $bindings = []): array
+    {
+        $stmt = $this->pdo->prepare($sql);
+        foreach ($bindings as $k => $v) $stmt->bindValue(is_int($k) ? $k + 1 : $k, $v);
+        $stmt->execute();
+        return $stmt->fetchAll();
+    }
 }

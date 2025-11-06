@@ -35,14 +35,17 @@ final class Kernel
     /**
      * Envoie la réponse au client (HTTP).
      */
-    public function terminate(Response $response): void
+    public function terminate(\Ivi\Http\Response $response): void
     {
-        // Évite le double envoi si tu utilises un flag global côté Debug/Output.
-        if (class_exists(\Ivi\Core\Debug\State::class) && \Ivi\Core\Debug\State::$outputStarted) {
+        // Si aucun header n'a encore été envoyé, on envoie proprement
+        if (!headers_sent()) {
+            $response->send();
             return;
         }
 
-        $response->send();
+        // Des headers/du HTML ont déjà été écrits (ex: Logger::dump exit=false)
+        // On ne peut plus envoyer les headers HTTP ; on affiche au moins le contenu.
+        echo $response->content();
     }
 
     /**
