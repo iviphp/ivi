@@ -9,6 +9,7 @@
 
 <body>
     <main>
+        <h1>Base.php</h1>
         <?= $content ?? '' ?>
     </main>
 </body>
