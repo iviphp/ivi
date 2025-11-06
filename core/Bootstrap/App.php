@@ -53,14 +53,15 @@ final class App
         // 1) Bootstrap environment, constants, and external services
         Loader::bootstrap($this->baseDir);
 
-        // 2) Configure the global Debug Logger
+        // 2) Configure the global Debug Logger (BASELINE, comme avant)
         Logger::configure([
             'app_namespaces' => ['Ivi\\Controllers\\', 'App\\'],
             'trace_strategy' => 'balanced',
             'max_trace'      => 10,
+            // on ne met PAS brand ici (on le fera après avoir lu la config)
         ]);
 
-        // 3) Load app configuration (debug/env)
+        // 3) Load app configuration (debug/env/brand/theme/error_detail)
         $appConfig = is_file($this->baseDir . '/config/app.php')
             ? require $this->baseDir . '/config/app.php'
             : [
@@ -68,10 +69,53 @@ final class App
                 'env'   => ($_ENV['APP_ENV'] ?? 'production'),
             ];
 
-        // 4) Initialize core services
-        $this->exceptions = new ExceptionHandler($appConfig);
+        $debug  = (bool)($appConfig['debug'] ?? (($_ENV['APP_DEBUG'] ?? '0') === '1'));
+        $env    = (string)($appConfig['env']   ?? ($_ENV['APP_ENV'] ?? 'production'));
+        $detail = (string)($appConfig['error_detail'] ?? ($_ENV['APP_ERROR_DETAIL'] ?? 'safe')); // none|safe|full
+
+        // Branding (Ivi | Softadastra)
+        $brand = (string)($appConfig['brand']      ?? ($_ENV['APP_BRAND']      ?? 'ivi'));
+        $theme = (string)($appConfig['theme']      ?? ($_ENV['APP_THEME']      ?? 'light'));
+        $logo  = (string)($appConfig['brand_logo'] ?? ($_ENV['APP_BRAND_LOGO'] ?? '/assets/logo/ivi.png'));
+
+        // Map error_detail -> Logger opts
+        $loggerOpts = match ($detail) {
+            'none' => ['show_trace' => false, 'show_context' => false, 'verbosity' => 'minimal', 'max_trace' => 0],
+            'safe' => ['show_trace' => true,  'show_context' => false, 'verbosity' => 'normal',  'max_trace' => 5],
+            default => ['show_trace' => true, 'show_context' => true,  'verbosity' => 'normal',  'max_trace' => 10], // full
+        };
+
+        // 3bis) Re-configure le Logger avec brand/theme + detail (on force aussi brand_name/page_title)
+        $brandName = ($brand === 'softadastra') ? 'Softadastra' : 'Ivi.php';
+        $pageTitle = ($brand === 'softadastra') ? 'Softadastra Debug Console' : 'ivi.php Debug Console';
+
+        Logger::configure(array_replace([
+            'brand'       => $brand,
+            'brand_logo'  => $logo,
+            'brand_name'  => $brandName,
+            'page_title'  => $pageTitle,
+            'theme'       => $theme,
+        ], $loggerOpts));
+
+        // (Optionnel) — Brancher VarDumper sur le Logger (dump() → panneau stylé)
+        if (class_exists(\Symfony\Component\VarDumper\VarDumper::class)) {
+            \Symfony\Component\VarDumper\VarDumper::setHandler(function ($var): void {
+                \Ivi\Core\Debug\Logger::dump('Dump', $var, [
+                    'exit'       => false,   // ne pas couper l’exécution
+                    'show_trace' => true,
+                ]);
+            });
+        }
+
+        // 4) Initialize core services (comme avant)
+        $this->exceptions = new ExceptionHandler([
+            'debug'        => $debug,
+            'env'          => $env,
+            'error_detail' => $detail,
+        ]);
         $this->request = Request::fromGlobals();
 
+        // Ajustements API (si /api)
         $uri = $this->request->path();
         if (\str_starts_with($uri, '/api')) {
             $_SERVER['HTTP_ACCEPT'] = ($_SERVER['HTTP_ACCEPT'] ?? '');
@@ -81,10 +125,11 @@ final class App
             $_SERVER['HTTP_X_IVI_EXPECT'] = 'json';
         }
 
-        $this->router     = new Router($this->resolver);
-        $this->kernel     = new Kernel($this->exceptions);
+        // 5) Router & Kernel (comme avant)
+        $this->router = new Router($this->resolver);
+        $this->kernel = new Kernel($this->exceptions);
 
-        // 5) Load application routes
+        // 6) Load application routes (comme avant)
         $this->registerRoutes();
     }
 
