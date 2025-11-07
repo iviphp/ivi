@@ -1,8 +1,43 @@
-# Getting Started
+<p align="center" style="margin:0;">
+  <img 
+    src="https://res.cloudinary.com/dwjbed2xb/image/upload/v1762524618/iviphp_jrpema.png" 
+    alt="Ivi.php Banner" 
+    width="100%" 
+    style="
+      display:block;
+      height:auto;
+      max-width:900px;
+      margin:auto;
+      object-fit:cover;
+      border-radius:8px;
+    ">
+</p>
 
-Welcome to **ivi.php** — a simple, modern, expressive PHP framework focused on clarity, speed, and a great developer experience.
+<h1 align="center">Ivi.php</h1>
 
-This guide helps you boot a fresh project, understand the folder layout, create a first route/controller/view, and connect to a database.
+<p align="center">
+  <img src="https://img.shields.io/badge/PHP-8.2+-blue">
+  <img src="https://img.shields.io/badge/License-MIT-green">
+</p>
+
+# 🟩 **Ivi.php** — Simple. Modern. Expressive.
+
+> **“Code with clarity.”**  
+> Ivi.php is a modern PHP framework built for developers who value simplicity, speed, and expressive code.  
+> Its minimal core and clean structure make building APIs and web applications a joyful experience.
+
+---
+
+# 🚀 Getting Started
+
+Welcome to **Ivi.php** — a lightweight, modern framework designed to help you build fast and elegant PHP applications.
+
+This guide will walk you through:
+
+- Bootstrapping a new project
+- Understanding the folder layout
+- Creating your first route, controller, and view
+- Connecting to a database with ease
 
 ---
 
@@ -279,3 +314,8 @@ return new HtmlResponse('<h1>Hello</h1>');
 ---
 
 Happy building with **ivi.php** 🚀
+
+## ⚖️ License
+
+MIT License © 2025 [GaspardKirira Authors](https://github.com/GaspardKirira)  
+Use freely, modify openly, contribute boldly. 🚀
