@@ -1,8 +1,14 @@
 {
-  "name": "ivi/ivi.php",
+  "name": "iviphp/ivi",
   "description": "ivi.php — Simple. Modern. Expressive.",
   "type": "project",
   "license": "MIT",
+  "authors": [
+    {
+      "name": "Gaspard Kirira",
+      "email": "you@example.com"
+    }
+  ],
   "autoload": {
     "psr-4": {
       "Ivi\\Core\\": "core/",
@@ -12,13 +18,13 @@
       "Ivi\\Router\\": "router/",
       "App\\": "src/"
     },
-    "bin": [
-      "bin/ivi"
-    ],
     "files": [
       "core/Support/Helpers.php"
     ]
   },
+  "bin": [
+    "bin/ivi"
+  ],
   "require": {
     "php": ">=8.1",
     "vlucas/phpdotenv": "^5.6",
@@ -39,7 +45,9 @@
     "lint": "vendor/bin/php-cs-fixer fix --allow-risky=yes"
   },
   "config": {
-    "process-timeout": 0
+    "process-timeout": 0,
+    "optimize-autoloader": true,
+    "sort-packages": true
   },
   "minimum-stability": "stable",
   "prefer-stable": true
