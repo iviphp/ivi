@@ -4,59 +4,56 @@ declare(strict_types=1);
 
 /**
  * -----------------------------------------------------------------------------
- * Global Debugging Helpers for Ivi.php
+ * Global Helpers & Aliases for Ivi.php
  * -----------------------------------------------------------------------------
  *
- * This file defines global helper functions for quick and consistent debugging
- * within both framework and user applications.
+ * This file defines global helper functions available throughout both the
+ * framework core and user applications. It provides:
  *
- * These helpers automatically delegate to the most appropriate logger:
- * - `App\Debug\Logger` if defined by the user (preferred)
- * - otherwise, fallback to `Ivi\Core\Debug\Logger`
+ * 1. **Debugging Utilities**
+ *    - `dump()`, `dd()`, `ivi_dump()`, `ivi_dd()` for consistent output.
  *
- * They provide a uniform interface for dumping or stopping execution while
- * preserving formatting and readability across CLI and web environments.
+ * 2. **Collection Aliases**
+ *    - `vector([...])`  → Ivi\Core\Collections\Vector
+ *    - `hashmap([...])` → Ivi\Core\Collections\HashMap
+ *    - `hashset([...])` → Ivi\Core\Collections\HashSet
+ *    - `str("...")`     → Ivi\Core\Collections\Str
  *
- * -----------------------------------------------------------------------------
- * Available Functions
- * -----------------------------------------------------------------------------
- * - `dump(mixed $data, array $options = []): void`
- *   Pretty-print any PHP variable using Ivi's Logger or fallback to plain text.
- *
- * - `dd(mixed $data, array $options = []): never`
- *   Equivalent to `dump()` followed by immediate termination (`die`).
- *
- * - `ivi_dump(mixed $data, array $options = []): void`
- *   Internal version that always uses Ivi\Core\Debug\Logger directly.
- *
- * - `ivi_dd(mixed $data, array $options = []): never`
- *   Internal variant of `dd()` using framework logger only.
+ * These aliases are safe, autoloaded, and usable anywhere inside the framework.
  *
  * -----------------------------------------------------------------------------
  * Example Usage
  * -----------------------------------------------------------------------------
  * ```php
- * dump($user);
- * dump($config, ['title' => 'Config Snapshot']);
+ * $v = vector([1, 2, 3]);
+ * $v->push(4);
  *
- * dd(['error' => 'Unexpected null value']);
+ * $m = hashmap(['lang' => 'PHP']);
+ * $m->put('version', '1.0');
  *
- * ivi_dump(['env' => $_ENV], ['theme' => 'dark']);
+ * $s = hashset(['apple', 'banana']);
+ * $s->add('orange');
+ *
+ * $t = str(' Hello Ivi ')->trim()->upper();
+ * dump($t->toString());
  * ```
  *
  * -----------------------------------------------------------------------------
- * Design Notes
- * -----------------------------------------------------------------------------
- * - Uses a layered fallback to ensure output even if Logger is unavailable.
- * - Safe to use in controllers, middleware, or CLI commands.
- * - Automatically sets headers to `text/plain` when necessary.
- * - Designed for both developers and framework internals.
- *
- * @package Ivi\Core\Debug
+ * @package Ivi\Core\Support
  * @category Helpers
  * @since 1.0.0
  * -----------------------------------------------------------------------------
  */
+
+use Ivi\Core\Debug\Logger;
+use Ivi\Core\Collections\Vector;
+use Ivi\Core\Collections\HashMap;
+use Ivi\Core\Collections\HashSet;
+use Ivi\Core\Collections\Str;
+
+/* -------------------------------------------------------------------------- */
+/* Debugging Helpers                                                          */
+/* -------------------------------------------------------------------------- */
 
 if (!function_exists('dump')) {
     /**
@@ -73,22 +70,15 @@ if (!function_exists('dump')) {
         $title = $options['title'] ?? 'Dump';
         unset($options['title']);
 
-        // 1) Use custom app logger if available
-        // if (class_exists(\App\Debug\Logger::class)) {
-        //     \App\Debug\Logger::dump($title, $data, $options);
-        //     return;
-        // }
-
-        // 2) Fallback to Ivi\Core logger
-        if (class_exists(\Ivi\Core\Debug\Logger::class)) {
-            \Ivi\Core\Debug\Logger::dump($title, $data, $options);
+        if (class_exists(Logger::class)) {
+            Logger::dump($title, $data, $options);
             return;
         }
 
-        // 3) Minimal plain-text fallback
         if (!headers_sent()) {
             header('Content-Type: text/plain; charset=utf-8');
         }
+
         echo $title . ":\n";
         print_r($data);
     }
@@ -120,7 +110,7 @@ if (!function_exists('ivi_dump')) {
     function ivi_dump(mixed $data, array $options = []): void
     {
         $title = $options['title'] ?? 'Dump';
-        \Ivi\Core\Debug\Logger::dump($title, $data, $options);
+        Logger::dump($title, $data, $options);
     }
 }
 
@@ -137,5 +127,65 @@ if (!function_exists('ivi_dd')) {
         $options['exit'] = true;
         ivi_dump($data, $options);
         exit;
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Collection Aliases                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Create a new Vector instance.
+ *
+ * @template T
+ * @param iterable<T> $items Initial elements.
+ * @return Vector<T>
+ */
+if (!function_exists('vector')) {
+    function vector(iterable $items = []): Vector
+    {
+        return new Vector($items);
+    }
+}
+
+/**
+ * Create a new HashMap instance.
+ *
+ * @template K of array-key
+ * @template V
+ * @param iterable<K,V> $items Initial key/value pairs.
+ * @return HashMap<K,V>
+ */
+if (!function_exists('hashmap')) {
+    function hashmap(iterable $items = []): HashMap
+    {
+        return new HashMap($items);
+    }
+}
+
+/**
+ * Create a new HashSet instance.
+ *
+ * @template T of array-key
+ * @param iterable<T> $items Initial elements.
+ * @return HashSet<T>
+ */
+if (!function_exists('hashset')) {
+    function hashset(iterable $items = []): HashSet
+    {
+        return new HashSet($items);
+    }
+}
+
+/**
+ * Create a fluent string wrapper (`Ivi\Core\Collections\Str`).
+ *
+ * @param string $value The initial string.
+ * @return Str
+ */
+if (!function_exists('str')) {
+    function str(string $value): Str
+    {
+        return new Str($value);
     }
 }
