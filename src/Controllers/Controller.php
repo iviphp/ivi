@@ -11,12 +11,93 @@ use Ivi\Http\TextResponse;
 use Ivi\Http\RedirectResponse;
 use Ivi\Core\View\ViewNotFoundException;
 
+/**
+ * Class Controller
+ *
+ * @package App\Controllers
+ *
+ * @brief Base controller class for all HTTP controllers in an Ivi.php application.
+ *
+ * This abstract base class defines a unified interface for rendering views,
+ * returning responses, and managing layouts. All application controllers
+ * should extend this class to ensure consistent behavior and predictable
+ * response handling across the framework.
+ *
+ * ### Design Philosophy
+ * - **Minimal & Explicit** — Keeps logic simple and transparent.
+ * - **Consistent Response Types** — Always returns typed responses
+ *   (`HtmlResponse`, `JsonResponse`, `TextResponse`, `RedirectResponse`).
+ * - **Framework Integration** — Provides built-in helpers that interact
+ *   seamlessly with the Ivi.php HTTP and View layers.
+ *
+ * ### Responsibilities
+ * - Render view templates (`render()` / `view()`)
+ * - Manage layout inheritance (`setLayout()`)
+ * - Provide helper methods for HTML, JSON, plain text, and redirects
+ * - Detect and handle AJAX/JSON requests automatically
+ * - Abstract away filesystem and buffer management for views
+ *
+ * ### Rendering Flow
+ * 1. The `view()` method resolves a dot-notation path (e.g., `"user.index"`)
+ *    into a PHP file under `/views/`.
+ * 2. The view is rendered with the provided parameters and optionally wrapped
+ *    in a layout (default: `base.php`).
+ * 3. The final HTML is returned as an `HtmlResponse` instance.
+ *
+ * ### Example
+ * ```php
+ * class HomeController extends Controller
+ * {
+ *     public function index(Request $request): HtmlResponse
+ *     {
+ *         return $this->view('home.index', ['title' => 'Welcome']);
+ *     }
+ *
+ *     public function about(): HtmlResponse
+ *     {
+ *         return $this->view('pages.about');
+ *     }
+ * }
+ * ```
+ *
+ * ### Customization
+ * - Use `setLayout('layouts/main.php')` to override the layout for the controller.
+ * - Pass an explicit status code to `view()` (e.g., `view('user.create', [...], $req, 422)`).
+ * - The `isAjax()` helper ensures that JSON/XHR requests bypass layout wrapping.
+ *
+ * @see \Ivi\Http\HtmlResponse
+ * @see \Ivi\Core\View\ViewNotFoundException
+ */
 abstract class Controller
 {
+    /** @var string Default layout file (relative to /views directory). */
     protected string $layout = 'base.php';
 
-    protected function render(string $path, ?array $params = null, ?Request $request = null, ?string $layoutOverride = null): HtmlResponse
-    {
+    /**
+     * Render a view file into a full HTML response.
+     *
+     * This method handles:
+     * - Resolving dot-notation view paths (e.g. "user.index" → "views/user/index.php")
+     * - Extracting parameters into local scope
+     * - Wrapping rendered content with a layout (if it exists)
+     * - Automatically skipping layouts for AJAX/JSON requests
+     *
+     * @param string               $path            The dot-notation path to the view file.
+     * @param array<string,mixed>|null $params      Data to be passed into the view.
+     * @param Request|null         $request         The current HTTP request (optional).
+     * @param string|null          $layoutOverride  Custom layout file (optional).
+     * @param int                  $status          HTTP status code for the response.
+     *
+     * @throws ViewNotFoundException if the view file cannot be found.
+     * @return HtmlResponse
+     */
+    protected function render(
+        string $path,
+        ?array $params = null,
+        ?Request $request = null,
+        ?string $layoutOverride = null,
+        int $status = 200
+    ): HtmlResponse {
         $viewsDir = $this->viewsBasePath();
         $filePath = $viewsDir . $this->dotToPath($path) . '.php';
 
@@ -32,14 +113,14 @@ abstract class Controller
         });
 
         if ($this->isAjax($request)) {
-            return new HtmlResponse($content, 200);
+            return new HtmlResponse($content, $status);
         }
 
         $layout = $layoutOverride ?? $this->layout;
         $layoutPath = $viewsDir . $layout;
 
         if (!is_file($layoutPath)) {
-            return new HtmlResponse($content, 200);
+            return new HtmlResponse($content, $status);
         }
 
         $full = $this->capture(function () use ($layoutPath, $content, $params) {
@@ -49,20 +130,36 @@ abstract class Controller
             require $layoutPath;
         });
 
-        return new HtmlResponse($full, 200);
+        return new HtmlResponse($full, $status);
     }
 
     /**
-     * Raccourci : vue avec le layout par défaut.
-     * Équivalent de ton `view('path', params)`.
+     * Shortcut for rendering a view using the default layout.
+     *
+     * Equivalent to calling `render($path, $params, $request, null, $status)`.
+     * Commonly used for controller endpoints that return standard HTML pages.
+     *
+     * @param string               $path     The dot-notation view path.
+     * @param array<string,mixed>|null $params Data passed to the view.
+     * @param Request|null         $request  Optional HTTP request object.
+     * @param int                  $status   HTTP status code.
+     *
+     * @return HtmlResponse
      */
-    protected function view(string $path, ?array $params = null, ?Request $request = null): HtmlResponse
-    {
-        return $this->render($path, $params, $request, null);
+    protected function view(
+        string $path,
+        ?array $params = null,
+        ?Request $request = null,
+        int $status = 200
+    ): HtmlResponse {
+        return $this->render($path, $params, $request, null, $status);
     }
 
     /**
-     * Fixe le layout par défaut (ex: "layouts/main.php")
+     * Change the default layout for subsequent views.
+     *
+     * @param string $layoutFile Relative path of the layout file (from `/views/`).
+     * @return static
      */
     protected function setLayout(string $layoutFile): static
     {
@@ -70,46 +167,54 @@ abstract class Controller
         return $this;
     }
 
-    // ---------------------
-    // Helpers de réponses
-    // ---------------------
+    // --------------------------------------------------------------------
+    // Response Helpers
+    // --------------------------------------------------------------------
 
+    /** Return a raw HTML response. */
     protected function html(string $html, int $status = 200): HtmlResponse
     {
         return new HtmlResponse($html, $status);
     }
 
+    /** Return a JSON response. */
     protected function json(mixed $data, int $status = 200): JsonResponse
     {
         return new JsonResponse($data, $status);
     }
 
+    /** Return a plain-text response. */
     protected function text(string $text, int $status = 200): TextResponse
     {
         return new TextResponse($text, $status);
     }
 
+    /** Return an HTTP redirect response. */
     protected function redirect(string $url, int $status = 302): RedirectResponse
     {
         return new RedirectResponse($url, $status);
     }
 
-    // ---------------------
-    // Internals
-    // ---------------------
+    // --------------------------------------------------------------------
+    // Internal Utilities
+    // --------------------------------------------------------------------
 
+    /**
+     * Detect whether the current request was made via AJAX or expects JSON.
+     *
+     * Used to automatically disable layouts and return raw HTML for XHR requests.
+     *
+     * @param Request|null $request The current request (optional).
+     * @return bool True if AJAX or JSON expected; false otherwise.
+     */
     protected function isAjax(?Request $request): bool
     {
-        // 1) Si Request est fourni (recommandé)
         if ($request) {
             $xrw = strtolower($request->header('x-requested-with', ''));
             if ($xrw === 'xmlhttprequest') return true;
-
-            // JSON-first UX
             if ($request->wantsJson()) return true;
         }
 
-        // 2) Fallback via superglobales (si Request non passé)
         $xhr = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
         if (strtolower($xhr) === 'xmlhttprequest') return true;
 
@@ -117,25 +222,36 @@ abstract class Controller
         return str_contains(strtolower($accept), 'application/json');
     }
 
-    /** Transforme "dir.file" en "dir/file" */
+    /** Convert dot-notation paths to filesystem paths. */
     protected function dotToPath(string $path): string
     {
         return str_replace('.', DIRECTORY_SEPARATOR, $path);
     }
 
-    /** Détermine le dossier des vues */
+    /**
+     * Determine the base directory for all view templates.
+     *
+     * @return string Absolute path to the views directory.
+     */
     protected function viewsBasePath(): string
     {
         if (defined('VIEWS')) {
-            $base = rtrim((string) VIEWS, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+            $base = rtrim((string)VIEWS, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
         } else {
-            // fallback par défaut : <project>/views/
             $base = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR;
         }
         return $base;
     }
 
-    /** Capture le buffer d’un callable et retourne la chaîne rendue */
+    /**
+     * Capture the output buffer of a callback and return its rendered content.
+     *
+     * This is used internally to safely evaluate PHP templates and return their
+     * output as strings without polluting global output buffers.
+     *
+     * @param callable $fn The function to capture output from.
+     * @return string Rendered output as a string.
+     */
     protected function capture(callable $fn): string
     {
         ob_start();
