@@ -15,9 +15,13 @@
 </head>
 
 <body>
+    <?php /* Header global */ include __DIR__ . '/partials/header.php'; ?>
+
     <main id="app">
         <?= $content ?? '' ?>
     </main>
+
+    <?php /* Footer global */ include __DIR__ . '/partials/footer.php'; ?>
 
     <!-- Global JS -->
     <script src="<?= asset('assets/js/app.js') ?>" defer></script>

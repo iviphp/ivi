@@ -1,36 +1,12 @@
 <?php
 
-/**
- * views/welcome/home.php
- * Rendered inside base.php
- */
+/** views/welcome/home.php — rendu dans base.php */
 ?>
-
-<header class="nav" data-header>
-    <div class="container nav-row">
-        <a class="nav-brand" href="/">
-            <img src="<?= asset('assets/logo/ivi.png') ?>" alt="ivi.php logo" width="26" height="26">
-            <span>ivi.php</span>
-        </a>
-
-        <nav class="nav-links">
-            <a href="/docs">Docs</a>
-            <a href="/guide">Guide</a>
-            <a href="/examples">Examples</a>
-            <a href="https://github.com/iviphp/ivi" target="_blank" rel="noopener">GitHub</a>
-        </nav>
-
-        <span class="nav-pill">v0.1.0 • DEV</span>
-    </div>
-</header>
-
 <section class="hero">
     <div class="container">
         <div class="badges">
-            <span class="badge">Simple</span>
-            <span class="dot"></span>
-            <span class="badge">Modern</span>
-            <span class="dot"></span>
+            <span class="badge">Simple</span><span class="dot"></span>
+            <span class="badge">Modern</span><span class="dot"></span>
             <span class="badge">Expressive</span>
         </div>
 
@@ -42,9 +18,7 @@
 
         <div class="actions">
             <a class="btn btn-lg" href="/docs" rel="noopener">Get Started</a>
-            <a class="btn secondary btn-lg" href="https://github.com/iviphp/ivi" target="_blank" rel="noopener">
-                View on GitHub
-            </a>
+            <a class="btn secondary btn-lg" href="https://github.com/iviphp/ivi" target="_blank" rel="noopener">View on GitHub</a>
         </div>
 
         <div class="install">
@@ -98,14 +72,3 @@
         </div>
     </div>
 </section>
-
-<footer>
-    <div class="foot">
-        © <span id="y"></span> ivi.php — Part of the Softadastra ecosystem.
-        <span class="foot-links">
-            <a class="link" href="https://github.com/iviphp/ivi" target="_blank" rel="noopener">GitHub</a>
-            &nbsp;•&nbsp;
-            <a class="link" href="/license" rel="noopener">MIT License</a>
-        </span>
-    </div>
-</footer>

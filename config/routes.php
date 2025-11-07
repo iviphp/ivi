@@ -1,7 +1,7 @@
 <?php
 
+use App\Controllers\Docs\DocsController;
 use App\Controllers\Home\HomeController;
-use App\Controllers\Doc\DocsController;
 use App\Controllers\User\UserController;
 use Ivi\Core\View\View;
 use Ivi\Http\JsonResponse;
@@ -12,7 +12,7 @@ use Ivi\Http\Request;
  * -------------------- */
 
 $router->get('/', [HomeController::class, 'home']);
-$router->get('/docs', [DocsController::class, 'doc']);
+$router->get('/docs', [DocsController::class, 'index']);
 $router->get('/ping', fn() => new \Ivi\Http\Response('pong'));
 
 /* --------------------

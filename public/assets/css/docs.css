@@ -1,0 +1,49 @@
+/* ==== Docs page only (hero & prose) ==== */
+.docs-hero {
+  background: var(--accent);
+  color: #fff;
+  padding: 80px 20px 60px;
+  text-align: center;
+}
+.docs-hero h1 {
+  font-size: clamp(32px, 4vw, 46px);
+  font-weight: 900;
+  margin-bottom: 12px;
+}
+.docs-hero .lead {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 22px;
+}
+.docs-hero .btn {
+  background: #fff;
+  color: var(--accent);
+  font-weight: 700;
+}
+.docs-hero .btn.secondary {
+  background: transparent;
+  color: #fff;
+  border: 1px solid #fff;
+}
+
+.docs-content {
+  padding: 50px 20px 70px;
+  max-width: 950px;
+}
+.docs-section {
+  margin-bottom: 60px;
+}
+.docs-section h2 {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+.docs-section p {
+  color: var(--fg);
+  margin-bottom: 14px;
+  line-height: 1.65;
+}
+.docs-section pre {
+  margin-top: 10px;
+}
