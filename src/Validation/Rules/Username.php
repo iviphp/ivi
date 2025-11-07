@@ -2,7 +2,7 @@
 
 namespace App\Validation\Rules;
 
-use Ivi\Validation\Contracts\Rule;
+use Ivi\Core\Validation\Contracts\Rule;
 
 final class Username implements Rule
 {
