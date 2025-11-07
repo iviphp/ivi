@@ -1,6 +1,6 @@
 <?php
 
-use App\Controllers\Product\HomeController;
+use App\Controllers\Home\HomeController;
 use App\Controllers\Doc\DocsController;
 use App\Controllers\User\UserController;
 use Ivi\Core\View\View;

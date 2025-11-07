@@ -189,3 +189,60 @@ if (!function_exists('str')) {
         return new Str($value);
     }
 }
+
+if (!function_exists('base_url')) {
+    /**
+     * Build a base URL from current request host + optional path.
+     * NOTE: ajuste si tu as une config d'URL connue (APP_URL).
+     */
+    function base_url(string $path = ''): string
+    {
+        // Si tu utilises $_ENV['APP_URL'], c'est encore mieux:
+        // $base = rtrim($_ENV['APP_URL'] ?? '', '/');
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $base   = $scheme . '://' . $host;
+        return rtrim($base, '/') . '/' . ltrim($path, '/');
+    }
+}
+
+if (!function_exists('asset')) {
+    /**
+     * Generate an asset URL, with cache-busting by filemtime (query param).
+     *
+     * @param string $path e.g. 'assets/css/app.css'
+     * @param bool   $version Append ?v=mtime for cache-busting
+     */
+    function asset(string $path, bool $version = true): string
+    {
+        $publicPath = __DIR__ . '/../../public/' . ltrim($path, '/');
+        $url = base_url($path);
+
+        if ($version && is_file($publicPath)) {
+            $ts = filemtime($publicPath) ?: time();
+            $sep = (str_contains($url, '?') ? '&' : '?');
+            $url .= $sep . 'v=' . $ts;
+        }
+        return $url;
+    }
+}
+
+if (!function_exists('mix')) {
+    /**
+     * Resolve a hashed asset via manifest.json (Vite/Webpack-like).
+     * Falls back to `asset()` if manifest not found or missing entry.
+     *
+     * @param string $logical e.g. 'assets/js/app.js'
+     */
+    function mix(string $logical): string
+    {
+        $manifestFile = __DIR__ . '/../../public/manifest.json';
+        if (is_file($manifestFile)) {
+            $map = json_decode((string)file_get_contents($manifestFile), true) ?: [];
+            if (isset($map[$logical])) {
+                return base_url($map[$logical]);
+            }
+        }
+        return asset($logical, true);
+    }
+}
