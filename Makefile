@@ -2,10 +2,15 @@ SHELL := /bin/bash
 .ONESHELL:
 .SHELLFLAGS := -eu -o pipefail -c
 
+# ---------------- Vars ----------------
 VERSION      ?= v0.1.0
 BRANCH_DEV   ?= dev
 BRANCH_MAIN  ?= main
 REMOTE       ?= origin
+
+# ---------------- PHONY ----------------
+.PHONY: force_ssh_remote install_gitleaks check_secrets preflight \
+        ensure-branch ensure-clean commit push merge tag release test changelog
 
 # ---- Utilitaire: forcer SSH pour GitHub (si HTTPS) ----
 force_ssh_remote:
@@ -32,39 +37,46 @@ install_gitleaks:
 	fi
 	@gitleaks version
 
-# ---------- Preflight ----------
-preflight: install_gitleaks force_ssh_remote
-	@echo "🔎 Preflight: secrets & branches..."
+check_secrets: install_gitleaks
+	@echo "🔎 Preflight: secrets scan..."
 	@gitleaks detect --source . --no-banner --redact
 	@echo "✅ Secrets check passed"
-	@echo "🔎 Sync $(BRANCH_DEV) & $(BRANCH_MAIN) ..."
-	git fetch $(REMOTE)
-	git checkout $(BRANCH_DEV)
-	git pull --rebase $(REMOTE) $(BRANCH_DEV)
-	# bugfix: slash manquant
-	@git show-ref --verify --quiet refs/heads/$(BRANCH_MAIN) || git branch $(BRANCH_MAIN) $(REMOTE)/$(BRANCH_MAIN)
-	git checkout $(BRANCH_MAIN)
-	git pull --rebase $(REMOTE) $(BRANCH_MAIN)
-	git checkout $(BRANCH_DEV)
 
-# ---------- Safety helpers ----------
+# ---------- Branch / Clean guards ----------
 ensure-branch:
 	@if [ "$$(git rev-parse --abbrev-ref HEAD)" != "$(BRANCH_DEV)" ]; then \
-		echo "❌ You must be on $(BRANCH_DEV) to commit."; \
+		echo "❌ You must be on $(BRANCH_DEV) to run this target."; \
 		exit 1; \
 	fi
 
 ensure-clean:
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "❌ Working tree not clean. Commit or stash first."; \
+		git status --porcelain; \
 		exit 1; \
 	fi
+
+# ---------- Sync dev & main (après commit) ----------
+preflight: force_ssh_remote
+	@echo "🔎 Sync $(BRANCH_DEV) & $(BRANCH_MAIN) ..."
+	git fetch $(REMOTE)
+	# S'assurer qu'on a bien les deux branches locales
+	@git show-ref --verify --quiet refs/heads/$(BRANCH_DEV) || git branch $(BRANCH_DEV) $(REMOTE)/$(BRANCH_DEV) || true
+	@git show-ref --verify --quiet refs/heads/$(BRANCH_MAIN) || git branch $(BRANCH_MAIN) $(REMOTE)/$(BRANCH_MAIN) || true
+	# Rebase dev sur sa remote
+	git checkout $(BRANCH_DEV)
+	git pull --rebase $(REMOTE) $(BRANCH_DEV)
+	# Rebase main sur sa remote
+	git checkout $(BRANCH_MAIN)
+	git pull --rebase $(REMOTE) $(BRANCH_MAIN)
+	# Revenir sur dev
+	git checkout $(BRANCH_DEV)
 
 # ---------- Core flow ----------
 commit: ensure-branch
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "📝 Committing changes..."; \
-		git add .; \
+		git add -A; \
 		git commit -m "chore(release): prepare $(VERSION)"; \
 	else \
 		echo "✅ Nothing to commit."; \
@@ -80,7 +92,7 @@ push: force_ssh_remote
 
 merge: force_ssh_remote
 	git checkout $(BRANCH_MAIN)
-	git merge --no-ff --no-edit $(BRANCH_DEV) || true
+	git merge --no-ff --no-edit $(BRANCH_DEV)
 	# push main avec retries
 	tries=0; until git push $(REMOTE) $(BRANCH_MAIN); do \
 		tries=$$((tries+1)); \
@@ -105,7 +117,10 @@ tag: force_ssh_remote
 		echo "⏳ Retry $$tries..."; sleep 3; \
 	done
 
-release: preflight commit ensure-clean push merge tag
+# Orchestration finale:
+# - commit d'abord (pour éviter le "cannot pull with rebase: unstaged changes")
+# - puis sync (preflight), on vérifie clean, puis push/merge/tag
+release: ensure-branch force_ssh_remote check_secrets commit preflight ensure-clean push merge tag
 
 test:
 	@if [ -d build ]; then cd build && ctest --output-on-failure; else echo "ℹ️ No build dir; skipping tests"; fi
