@@ -1,8 +1,9 @@
+# ---------------- Base Shell ----------------
 SHELL := /bin/bash
 .ONESHELL:
 .SHELLFLAGS := -eu -o pipefail -c
 
-# ---------------- Vars ----------------
+# ---------------- Variables ----------------
 VERSION      ?= v0.1.0
 BRANCH_DEV   ?= dev
 BRANCH_MAIN  ?= main
@@ -10,19 +11,38 @@ REMOTE       ?= origin
 
 # ---------------- PHONY ----------------
 .PHONY: force_ssh_remote install_gitleaks check_secrets preflight \
-        ensure-branch ensure-clean commit push merge tag release test changelog
+        ensure-branch ensure-clean commit push merge tag release \
+        test changelog help
 
-# ---- Utilitaire: forcer SSH pour GitHub (si HTTPS) ----
+# ---------------- Help ----------------
+help:
+	@echo "Targets:"
+	@echo "  release VERSION=vX.Y.Z  Run full release flow (commit -> sync -> push/merge -> tag)"
+	@echo "  commit                  Commit all changes on $(BRANCH_DEV)"
+	@echo "  preflight               Sync branches with retries (fetch & rebase)"
+	@echo "  push                    Push $(BRANCH_DEV) with retries"
+	@echo "  merge                   Merge $(BRANCH_DEV) -> $(BRANCH_MAIN) and push with retries"
+	@echo "  tag VERSION=vX.Y.Z      Create and push annotated tag"
+	@echo "  test                    Run ctest in ./build if present"
+	@echo "  changelog               Run scripts/update_changelog.sh if present"
+
+# ---------------- Git Remote (force SSH) ----------------
 force_ssh_remote:
+	@echo "🔐 Forcing SSH for GitHub remotes..."
+	# Transforme automatiquement tout URL https://github.com/* en git@github.com:* (global)
+	@git config --global url."git@github.com:".insteadOf https://github.com/
+	# Réécrit l'origin actuel s'il est encore en HTTPS
 	@url="$$(git remote get-url $(REMOTE))"; \
 	if [[ "$$url" =~ ^https://github.com/ ]]; then \
-		echo "🔐 Switching remote to SSH..."; \
-		git remote set-url $(REMOTE) "$$(echo "$$url" | sed 's#https://github.com/#git@github.com:#')"; \
+		new="$${url/https:\/\/github.com\//git@github.com:}"; \
+		echo "🔁 Switching $(REMOTE) to $$new"; \
+		git remote set-url $(REMOTE) "$$new"; \
 	fi
 	@echo "Remote $(REMOTE): $$(git remote get-url $(REMOTE))"
+	# Check SSH (ne plante pas si réseau HS)
 	@ssh -T git@github.com >/dev/null 2>&1 || true
 
-# ---------- Tools ----------
+# ---------------- Tools / Security ----------------
 install_gitleaks:
 	@echo "🔧 Checking gitleaks..."
 	@if ! command -v gitleaks >/dev/null 2>&1; then \
@@ -42,7 +62,7 @@ check_secrets: install_gitleaks
 	@gitleaks detect --source . --no-banner --redact
 	@echo "✅ Secrets check passed"
 
-# ---------- Branch / Clean guards ----------
+# ---------------- Guards ----------------
 ensure-branch:
 	@if [ "$$(git rev-parse --abbrev-ref HEAD)" != "$(BRANCH_DEV)" ]; then \
 		echo "❌ You must be on $(BRANCH_DEV) to run this target."; \
@@ -56,23 +76,37 @@ ensure-clean:
 		exit 1; \
 	fi
 
-# ---------- Sync dev & main (après commit) ----------
+# ---------------- Sync (avec retries) ----------------
 preflight: force_ssh_remote
 	@echo "🔎 Sync $(BRANCH_DEV) & $(BRANCH_MAIN) ..."
-	git fetch $(REMOTE)
+	# fetch avec retries (réseau/DNS)
+	@tries=0; until git fetch $(REMOTE); do \
+		tries=$$((tries+1)); \
+		if [ $$tries -ge 5 ]; then echo "❌ git fetch failed after $$tries tries"; exit 128; fi; \
+		echo "⏳ Retry $$tries (fetch)..."; sleep 3; \
+	done
 	# S'assurer qu'on a bien les deux branches locales
 	@git show-ref --verify --quiet refs/heads/$(BRANCH_DEV) || git branch $(BRANCH_DEV) $(REMOTE)/$(BRANCH_DEV) || true
 	@git show-ref --verify --quiet refs/heads/$(BRANCH_MAIN) || git branch $(BRANCH_MAIN) $(REMOTE)/$(BRANCH_MAIN) || true
-	# Rebase dev sur sa remote
-	git checkout $(BRANCH_DEV)
-	git pull --rebase $(REMOTE) $(BRANCH_DEV)
-	# Rebase main sur sa remote
-	git checkout $(BRANCH_MAIN)
-	git pull --rebase $(REMOTE) $(BRANCH_MAIN)
-	# Revenir sur dev
-	git checkout $(BRANCH_DEV)
 
-# ---------- Core flow ----------
+	# Rebase dev sur sa remote (avec retries)
+	@tries=0; until git checkout $(BRANCH_DEV) && git pull --rebase $(REMOTE) $(BRANCH_DEV); do \
+		tries=$$((tries+1)); \
+		if [ $$tries -ge 5 ]; then echo "❌ rebase $(BRANCH_DEV) failed after $$tries tries"; exit 128; fi; \
+		echo "⏳ Retry $$tries (pull --rebase $(BRANCH_DEV))..."; sleep 3; \
+	done
+
+	# Rebase main sur sa remote (avec retries)
+	@tries=0; until git checkout $(BRANCH_MAIN) && git pull --rebase $(REMOTE) $(BRANCH_MAIN); do \
+		tries=$$((tries+1)); \
+		if [ $$tries -ge 5 ]; then echo "❌ rebase $(BRANCH_MAIN) failed after $$tries tries"; exit 128; fi; \
+		echo "⏳ Retry $$tries (pull --rebase $(BRANCH_MAIN))..."; sleep 3; \
+	done
+
+	@git checkout $(BRANCH_DEV)
+	@echo "✅ Preflight sync OK"
+
+# ---------------- Core Flow ----------------
 commit: ensure-branch
 	@if [ -n "$$(git status --porcelain)" ]; then \
 		echo "📝 Committing changes..."; \
@@ -84,7 +118,7 @@ commit: ensure-branch
 
 push: force_ssh_remote
 	# push dev avec retries
-	tries=0; until git push $(REMOTE) $(BRANCH_DEV); do \
+	@tries=0; until git push $(REMOTE) $(BRANCH_DEV); do \
 		tries=$$((tries+1)); \
 		if [ $$tries -ge 5 ]; then echo "❌ push $(BRANCH_DEV) failed after $$tries tries"; exit 128; fi; \
 		echo "⏳ Retry $$tries..."; sleep 3; \
@@ -94,12 +128,13 @@ merge: force_ssh_remote
 	git checkout $(BRANCH_MAIN)
 	git merge --no-ff --no-edit $(BRANCH_DEV)
 	# push main avec retries
-	tries=0; until git push $(REMOTE) $(BRANCH_MAIN); do \
+	@tries=0; until git push $(REMOTE) $(BRANCH_MAIN); do \
 		tries=$$((tries+1)); \
 		if [ $$tries -ge 5 ]; then echo "❌ push $(BRANCH_MAIN) failed after $$tries tries"; exit 128; fi; \
 		echo "⏳ Retry $$tries..."; sleep 3; \
 	done
 	git checkout $(BRANCH_DEV)
+	@echo "✅ Merge & push to $(BRANCH_MAIN) OK"
 
 tag: force_ssh_remote
 	@if ! [[ "$(VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$$ ]]; then \
@@ -111,19 +146,21 @@ tag: force_ssh_remote
 	@echo "🏷️  Creating annotated tag $(VERSION)..."
 	git tag -a $(VERSION) -m "chore(release): $(VERSION)"
 	# push tag avec retries
-	tries=0; until git push $(REMOTE) $(VERSION); do \
+	@tries=0; until git push $(REMOTE) $(VERSION); do \
 		tries=$$((tries+1)); \
 		if [ $$tries -ge 5 ]; then echo "❌ push tag $(VERSION) failed after $$tries tries"; exit 128; fi; \
 		echo "⏳ Retry $$tries..."; sleep 3; \
 	done
+	@echo "✅ Tag $(VERSION) pushed"
 
-# Orchestration finale:
-# - commit d'abord (pour éviter le "cannot pull with rebase: unstaged changes")
-# - puis sync (preflight), on vérifie clean, puis push/merge/tag
+# ---------------- Orchestration ----------------
+# Ordre sûr : commit -> preflight(sync) -> ensure-clean -> push dev -> merge to main -> tag
 release: ensure-branch force_ssh_remote check_secrets commit preflight ensure-clean push merge tag
+	@echo "🎉 Release $(VERSION) done!"
 
+# ---------------- Extras ----------------
 test:
 	@if [ -d build ]; then cd build && ctest --output-on-failure; else echo "ℹ️ No build dir; skipping tests"; fi
 
 changelog:
-	bash scripts/update_changelog.sh || true
+	@bash scripts/update_changelog.sh || true
