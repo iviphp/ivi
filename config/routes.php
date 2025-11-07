@@ -2,7 +2,7 @@
 
 use App\Controllers\Product\HomeController;
 use App\Controllers\Doc\DocsController;
-use App\Controllers\User\UserController;   // ⬅️ important
+use App\Controllers\User\UserController;
 use Ivi\Core\View\View;
 use Ivi\Http\JsonResponse;
 use Ivi\Http\Request;
