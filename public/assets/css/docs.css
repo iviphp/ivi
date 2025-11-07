@@ -1,4 +1,20 @@
-/* ==== Docs page only (hero & prose) ==== */
+/**
+ * ivi.php — Documentation styles (hero, prose, and advanced code blocks)
+ *
+ * This stylesheet scopes all advanced code block visuals to `.docs-content`
+ * so global pages remain unaffected. It provides a Vue/VitePress-inspired
+ * editor-like background, clear syntax token colors, a language badge,
+ * and a modern Copy button with success state.
+ *
+ * How it works:
+ * - Local palette via `.docs-content { --code-... }` to avoid global conflicts
+ * - Dark/Light palettes via prefers-color-scheme
+ * - Works with your server-side wrapper and `.line` stripes
+ * - Token classes: .tok-kw, .tok-fn, .tok-var, .tok-str, .tok-num, .tok-op, .tok-cmt, .tok-tag
+ */
+
+/* ==== Docs page (hero, prose) ==== */
+
 .docs-hero {
   background: var(--accent);
   color: #fff;
@@ -32,6 +48,13 @@
 }
 .docs-section {
   margin-bottom: 60px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.docs-section.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 .docs-section h2 {
   font-size: 26px;
@@ -44,6 +67,234 @@
   margin-bottom: 14px;
   line-height: 1.65;
 }
-.docs-section pre {
-  margin-top: 10px;
+
+/* ==== Local code palette (scoped to docs only) ==== */
+
+.docs-content {
+  /* Default to dark-ish editor; overridden in light mode media query below */
+  --docs-code-bg: #0d1117;
+  --docs-code-fg: #e6edf3;
+  --docs-code-border: #1f2937;
+  --docs-code-line: rgba(255, 255, 255, 0.02);
+  --docs-code-accent: #22d3ee;
+
+  /* Token colors (inspired by Shiki/VitePress) */
+  --tok-kw: #ff7b72;
+  --tok-fn: #d2a8ff;
+  --tok-var: #f9e2af;
+  --tok-str: #a5d6ff;
+  --tok-num: #fca5a5;
+  --tok-op: #e2e8f0;
+  --tok-cmt: #64748b;
+  --tok-tag: #fb7185;
+}
+
+/* Auto-adjust for light UI preference */
+@media (prefers-color-scheme: light) {
+  .docs-content {
+    --docs-code-bg: #f9fafb;
+    --docs-code-fg: #1e293b;
+    --docs-code-border: #e2e8f0;
+    --docs-code-line: rgba(0, 0, 0, 0.03);
+    --docs-code-accent: #008037;
+
+    --tok-kw: #b91c1c;
+    --tok-fn: #7c3aed;
+    --tok-var: #a16207;
+    --tok-str: #0369a1;
+    --tok-num: #b91c1c;
+    --tok-op: #0f172a;
+    --tok-cmt: #475569;
+    --tok-tag: #9d174d;
+  }
+}
+
+/* ==== Advanced code block (scoped) ==== */
+
+.docs-content .code-block {
+  position: relative;
+  margin: 24px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--docs-code-bg);
+  border: 1px solid var(--docs-code-border);
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.2);
+}
+
+.docs-content .code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: color-mix(in oklab, var(--docs-code-bg) 80%, #000 20%);
+  padding: 8px 14px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--docs-code-border);
+}
+
+.docs-content .lang-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+  color: color-mix(in oklab, var(--docs-code-fg) 65%, #8aa0b2 35%);
+  letter-spacing: 0.2px;
+  text-transform: uppercase;
+}
+
+/* Code area */
+.docs-content .code-block pre {
+  margin: 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  background: var(--docs-code-bg);
+  color: var(--docs-code-fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.65;
+  border: none;
+}
+
+.docs-content .code-block pre code {
+  background: transparent;
+  color: inherit;
+}
+
+/* Optional row stripes */
+.docs-content .code-block pre code .line {
+  display: block;
+  padding-inline: 0;
+}
+.docs-content .code-block pre code .line:nth-child(odd) {
+  background: var(--docs-code-line);
+}
+
+/* Copy button */
+.docs-content .copy-btn {
+  appearance: none;
+  border: none;
+  background: var(--docs-code-accent);
+  color: #0d1117;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.docs-content .copy-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px
+    color-mix(in oklab, var(--docs-code-accent) 30%, transparent);
+}
+.docs-content .copy-btn.copied {
+  background: #10b981;
+  color: #fff;
+}
+.docs-content .copy-btn.copied::after {
+  content: " ✓ Copied!";
+  margin-left: 5px;
+  font-weight: 600;
+}
+
+/* Selection and scrollbar */
+.docs-content .code-block ::selection {
+  background: color-mix(in oklab, var(--docs-code-accent) 35%, transparent);
+}
+.docs-content .code-block pre::-webkit-scrollbar {
+  height: 10px;
+}
+.docs-content .code-block pre::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--docs-code-fg) 18%, transparent);
+  border-radius: 10px;
+}
+
+/* ==== Token colors (visible even without external highlighter) ==== */
+.docs-content .tok-kw {
+  color: var(--tok-kw);
+}
+.docs-content .tok-fn {
+  color: var(--tok-fn);
+}
+.docs-content .tok-var {
+  color: var(--tok-var);
+}
+.docs-content .tok-str {
+  color: var(--tok-str);
+}
+.docs-content .tok-num {
+  color: var(--tok-num);
+}
+.docs-content .tok-op {
+  color: var(--tok-op);
+}
+.docs-content .tok-cmt {
+  color: var(--tok-cmt);
+  font-style: italic;
+}
+.docs-content .tok-tag {
+  color: var(--tok-tag);
+}
+
+/* Smooth reveal (in case IntersectionObserver is used) */
+.docs-section {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s, transform 0.5s;
+}
+.docs-section.visible {
+  opacity: 1;
+  transform: none;
+}
+/* Force HLJS tokens to use our palette */
+.docs-content pre code.hljs {
+  background: transparent;
+  color: var(--docs-code-fg);
+}
+
+.docs-content .hljs-keyword,
+.docs-content .hljs-operator.word {
+  color: var(--tok-kw);
+  font-weight: 600;
+}
+
+.docs-content .hljs-built_in,
+.docs-content .hljs-type,
+.docs-content .hljs-class .hljs-title,
+.docs-content .hljs-title,
+.docs-content .hljs-function .hljs-title {
+  color: var(--tok-fn);
+}
+
+.docs-content .hljs-attr,
+.docs-content .hljs-attribute,
+.docs-content .hljs-property,
+.docs-content .hljs-variable,
+.docs-content .hljs-symbol {
+  color: var(--tok-var);
+}
+
+.docs-content .hljs-string,
+.docs-content .hljs-template-tag,
+.docs-content .hljs-template-variable,
+.docs-content .hljs-regexp {
+  color: var(--tok-str);
+}
+
+.docs-content .hljs-number,
+.docs-content .hljs-literal {
+  color: var(--tok-num);
+}
+
+.docs-content .hljs-meta,
+.docs-content .hljs-meta .hljs-string,
+.docs-content .hljs-tag,
+.docs-content .hljs-name {
+  color: var(--tok-tag);
+}
+
+.docs-content .hljs-comment {
+  color: var(--tok-cmt);
+  font-style: italic;
+}
+.docs-content .hljs-operator {
+  color: var(--tok-op);
 }
