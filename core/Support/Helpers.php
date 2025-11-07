@@ -246,3 +246,46 @@ if (!function_exists('mix')) {
         return asset($logical, true);
     }
 }
+
+if (!function_exists('base_path')) {
+    /**
+     * Absolute path to project root (where composer.json lives).
+     *
+     * Examples:
+     *  base_path();                         // /home/you/iviphp/ivi
+     *  base_path('docs/getting-started.md') // /home/you/iviphp/ivi/docs/getting-started.md
+     */
+    function base_path(string $path = ''): string
+    {
+        // core/Support/Helpers.php → up 2 levels = project root
+        $root = realpath(__DIR__ . '/../../') ?: __DIR__ . '/../../';
+        return $path !== '' ? rtrim($root, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR) : $root;
+    }
+}
+
+if (!function_exists('public_path')) {
+    /** Absolute path to /public */
+    function public_path(string $path = ''): string
+    {
+        $base = base_path('public');
+        return $path !== '' ? $base . DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR) : $base;
+    }
+}
+
+if (!function_exists('resource_path')) {
+    /** Absolute path to /views, /lang, etc. (you can point to /views by default) */
+    function resource_path(string $path = ''): string
+    {
+        $base = base_path('views');
+        return $path !== '' ? $base . DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR) : $base;
+    }
+}
+
+if (!function_exists('docs_path')) {
+    /** Absolute path to /docs */
+    function docs_path(string $path = ''): string
+    {
+        $base = base_path('docs');
+        return $path !== '' ? $base . DIRECTORY_SEPARATOR . ltrim($path, DIRECTORY_SEPARATOR) : $base;
+    }
+}

@@ -13,6 +13,7 @@ use Ivi\Http\Request;
 
 $router->get('/', [HomeController::class, 'home']);
 $router->get('/docs', [DocsController::class, 'index']);
+$router->get('/about', fn() => 'About Page');
 $router->get('/ping', fn() => new \Ivi\Http\Response('pong'));
 
 /* --------------------

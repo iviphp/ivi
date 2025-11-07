@@ -1,13 +1,27 @@
-/* ==== ivi.php global base + shared header/footer ==== */
+/* ==== ivi.php global base + shared header/footer (cleaned) ==== */
+
+/* Light mode defaults */
 :root {
+  /* Brand & UI */
   --accent: #008037;
-  --bg: #fff;
-  --fg: #111;
-  --muted: #555;
-  --panel: #fff;
+  --bg: #ffffff;
+  --fg: #111111;
+  --muted: #555555;
+  --panel: #ffffff;
   --border: #e5e7eb;
-  --code: #f6faf7;
+
+  /* Code block (neutral default; docs.css peut surcharger localement) */
+  --code-bg: #0b1220; /* dark navy */
+  --code-fg: #e6edf3; /* light text */
+  --code-border: #0a101b;
+  --code-line: #0f172a;
+  --code-accent: #7dd3fc;
+
+  /* Back-compat alias (old var name used elsewhere) */
+  --code: var(--code-bg);
 }
+
+/* Dark mode overrides */
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #0f1115;
@@ -15,9 +29,18 @@
     --muted: #9aa4ad;
     --panel: #0f141a;
     --border: #1f252c;
-    --code: #0f1a12;
+
+    /* Code block (slightly different dark hue) */
+    --code-bg: #0f172a; /* deep slate */
+    --code-fg: #e2e8f0;
+    --code-border: #0b1220;
+    --code-line: #111827;
+    --code-accent: #7dd3fc;
+
+    --code: var(--code-bg); /* keep alias consistent */
   }
 }
+
 * {
   box-sizing: border-box;
 }
@@ -175,7 +198,7 @@ body {
   border-radius: 14px;
 }
 
-/* --- Shared code blocks --- */
+/* --- Shared code blocks (basic) --- */
 pre {
   background: var(--code);
   border: 1px solid var(--border);

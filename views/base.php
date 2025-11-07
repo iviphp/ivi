@@ -8,6 +8,11 @@
     <meta name="color-scheme" content="light dark">
     <?= $meta ?? '' ?>
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="<?= asset('assets/favicon/favicon.png') ?>">
+    <link rel="apple-touch-icon" href="<?= asset('assets/favicon/favicon.png') ?>">
+    <meta name="theme-color" content="#008037">
+
     <!-- Global CSS -->
     <link rel="stylesheet" href="<?= asset('assets/css/app.css') ?>">
     <!-- Page-level CSS (optional) -->
@@ -15,13 +20,14 @@
 </head>
 
 <body>
-    <?php /* Header global */ include __DIR__ . '/partials/header.php'; ?>
+
+    <?php include base_path('views/partials/header.php'); ?>
 
     <main id="app">
         <?= $content ?? '' ?>
     </main>
 
-    <?php /* Footer global */ include __DIR__ . '/partials/footer.php'; ?>
+    <?php include base_path('views/partials/footer.php'); ?>
 
     <!-- Global JS -->
     <script src="<?= asset('assets/js/app.js') ?>" defer></script>

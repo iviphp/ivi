@@ -12,6 +12,7 @@ $active = function (string $href) use ($currentPath): string {
 };
 ?>
 
+<?php /** views/partials/header.php */ ?>
 <header class="nav" data-header>
     <div class="container nav-row">
         <a class="nav-brand" href="/">
@@ -20,13 +21,13 @@ $active = function (string $href) use ($currentPath): string {
         </a>
 
         <nav class="nav-links">
-            <a href="/" class="<?= $active('/') ?>">Home</a>
-            <a href="/docs" class="<?= $active('/docs') ?>">Docs</a>
-            <a href="/guide" class="<?= $active('/guide') ?>">Guide</a>
-            <a href="/examples" class="<?= $active('/examples') ?>">Examples</a>
+            <a href="/">Home</a>
+            <a href="/docs">Docs</a>
+            <a href="/guide">Guide</a>
+            <a href="/examples">Examples</a>
             <a href="https://github.com/iviphp/ivi" target="_blank" rel="noopener">GitHub</a>
         </nav>
 
-        <span class="nav-pill">v0.1.0 • DEV</span>
+        <span class="nav-pill"><?= htmlspecialchars($_ENV['IVI_VERSION'] ?? 'v0.1.0 • DEV') ?></span>
     </div>
 </header>
