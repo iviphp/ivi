@@ -3,7 +3,32 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../vendor/autoload.php';
+/**
+ * Robust Composer autoloader discovery
+ * - Local project:   <project>/vendor/autoload.php
+ * - Package vendor:  ~/.config/composer/vendor/autoload.php  (Composer v2)
+ * - Legacy vendor:   ~/.composer/vendor/autoload.php          (Composer v1)
+ * - Fallback:        ../../autoload.php (in case of vendor/bin symlink)
+ */
+$autoloadCandidates = [
+    __DIR__ . '/../vendor/autoload.php',                     // package-local (create-project)
+    dirname(__DIR__, 2) . '/vendor/autoload.php',            // vendor/bin/ivi -> ../../vendor/autoload.php
+    getenv('COMPOSER_HOME') ? rtrim(getenv('COMPOSER_HOME'), '/') . '/vendor/autoload.php' : null, // composer v2
+    $_SERVER['HOME'] ? rtrim($_SERVER['HOME'], '/') . '/.config/composer/vendor/autoload.php' : null, // composer v2 default
+    $_SERVER['HOME'] ? rtrim($_SERVER['HOME'], '/') . '/.composer/vendor/autoload.php' : null, // composer v1 default
+];
+$autoload = null;
+foreach ($autoloadCandidates as $c) {
+    if ($c && is_file($c)) {
+        $autoload = $c;
+        break;
+    }
+}
+if (!$autoload) {
+    fwrite(STDERR, "[ERROR] Could not locate Composer autoload.php\n");
+    exit(1);
+}
+require $autoload;
 
 use Ivi\Core\Console\CommandRunner;
 
@@ -29,38 +54,31 @@ final class CliBootstrap
     {
         $cmd = $argv[1] ?? null;
 
-        // ---- Commande : ivi new <project> ----
+        // ivi new <name>
         if ($cmd === 'new') {
-            $projectName = $argv[2] ?? null;
-
-            if (!$projectName) {
+            $name = $argv[2] ?? null;
+            if (!$name) {
                 echo self::badge('ERROR', 'red') . " Missing project name.\n";
                 echo self::badge('INFO', 'yellow') . " Usage: ivi new <project-name>\n";
                 exit(1);
             }
 
-            echo self::badge('IVI', 'cyan') . " Creating new project: {$projectName}\n";
+            echo self::badge('IVI', 'cyan') . " Creating new project: {$name}\n";
+            $cmdLine = sprintf('composer create-project iviphp/ivi %s', escapeshellarg($name));
+            passthru($cmdLine, $code);
 
-            $cmdLine = sprintf('composer create-project iviphp/ivi %s', escapeshellarg($projectName));
-            passthru($cmdLine, $exitCode);
-
-            if ($exitCode === 0) {
-                echo self::badge('DONE', 'green') . " Project '{$projectName}' created successfully!\n";
-                echo self::badge('TIP', 'yellow') . " Next steps:\n";
-                echo "  cd {$projectName}\n";
-                echo "  composer serve\n";
+            if ($code === 0) {
+                echo self::badge('DONE', 'green') . " Project '{$name}' created!\n";
+                echo self::badge('TIP', 'yellow') . " Next:\n  cd {$name}\n  composer serve\n";
             } else {
-                echo self::badge('ERROR', 'red') . " Project creation failed (code: {$exitCode})\n";
+                echo self::badge('ERROR', 'red') . " Creation failed (code {$code}).\n";
             }
-
-            exit($exitCode);
+            exit($code);
         }
 
-        // ---- Autres commandes CLI internes ----
-        $runner = new CommandRunner();
-        $runner->run($argv);
+        // fallback: commands internes
+        (new CommandRunner())->run($argv);
     }
 }
 
-// ---- Point d’entrée principal ----
 CliBootstrap::run($argv);
