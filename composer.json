@@ -16,7 +16,7 @@
       "bin/ivi"
     ],
     "files": [
-      "support/helpers.php"
+      "core/Support/Helpers.php"
     ]
   },
   "require": {

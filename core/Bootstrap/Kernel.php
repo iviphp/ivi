@@ -8,7 +8,7 @@ use Ivi\Http\Request;
 use Ivi\Http\Response;
 use Ivi\Http\TextResponse;
 use Ivi\Http\JsonResponse;
-use Ivi\Router\Router;
+use Ivi\Core\Router\Router;
 use Ivi\Core\Exceptions\ExceptionHandler;
 
 final class Kernel

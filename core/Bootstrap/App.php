@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Ivi\Core\Bootstrap;
 
 use Ivi\Http\Request;
-use Ivi\Router\Router;
+use Ivi\Core\Router\Router;
 use Ivi\Core\Debug\Logger;
 use Ivi\Core\Exceptions\ExceptionHandler;
 
