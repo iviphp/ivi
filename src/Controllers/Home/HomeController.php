@@ -14,12 +14,10 @@ final class HomeController extends Controller
 
     public function home(Request $request): HtmlResponse
     {
-        $data = [
-            'title'   => 'Welcome to ivi.php',
-            'styles'  => '<link rel="stylesheet" href="' . asset('assets/css/welcome.css') . '">',
+        return $this->view('welcome.home', [
+            'title'  => 'Welcome to ivi.php',
+            'styles' => '<link rel="stylesheet" href="' . asset('assets/css/welcome.css') . '">',
             'scripts' => '<script src="' . asset('assets/js/welcome.js') . '" defer></script>',
-        ];
-
-        return $this->view($this->path . 'home', $data, $request);
+        ], $request);
     }
 }

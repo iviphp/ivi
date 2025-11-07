@@ -1,39 +1,42 @@
 <?php
 
-dump($title);
+/** views/docs/index.php — rendu dans base.php */
 ?>
+<section class="docs-hero">
+    <div class="container">
+        <h1>Documentation</h1>
+        <p class="lead">Learn how to build fast and expressive apps with <strong>ivi.php</strong>.</p>
+        <div class="actions">
+            <a href="#getting-started" class="btn">Get Started</a>
+            <a href="#routing" class="btn secondary">Routing →</a>
+        </div>
+    </div>
+</section>
 
-<h1><?= $title ? $title : 'Doc'; ?></h1>
+<main class="docs-content container">
+    <article id="getting-started" class="docs-section">
+        <h2>Getting Started</h2>
+        <p>Install the framework using Composer:</p>
+        <pre><code>composer create-project iviphp/ivi myapp</code></pre>
 
-# 🟩 ivi.php
+        <p>Then start the built-in PHP server:</p>
+        <pre><code>php -S localhost:8000 -t public</code></pre>
+    </article>
 
-> **Simple. Modern. Expressive.**
-> A new-generation PHP framework built for clarity, speed, and developer joy.
+    <article id="routing" class="docs-section">
+        <h2>Routing</h2>
+        <p>Define your routes in <code>config/routes.php</code> using a simple syntax:</p>
+        <pre><code>$router->get('/', [HomeController::class, 'home']);
+$router->get('/about', fn() => 'About Page');</code></pre>
+    </article>
 
----
-
-## ⚡ Quick Example
-
-```php
-require __DIR__ . '/vendor/autoload.php';
-
-use Ivi\Core\Bootstrap\App;
-use Ivi\Http\Request;
-
-// Initialize the application (sets BASE_PATH, loads .env, etc.)
-$app = new App(__DIR__);
-
-// Register routes
-$app->router->get('/', fn() => ['hello' => 'ivi.php']);
-
-$app->router->get('/user/{name}', function (array $params) {
-return ['hello' => $params['name']];
-});
-
-$app->router->post('/echo', fn(Request $req) => [
-'you_sent' => $req->json()
-]);
-
-// Run the application
-$app->run();
-```
+    <article id="controllers" class="docs-section">
+        <h2>Controllers</h2>
+        <p>Controllers extend the <code>App\Controllers\Controller</code> base class and return a <code>Response</code> or <code>HtmlResponse</code>:</p>
+        <pre><code>class HomeController extends Controller {
+  public function home(Request $request): HtmlResponse {
+    return $this->view('welcome.home', ['title' => 'Welcome']);
+  }
+}</code></pre>
+    </article>
+</main>
