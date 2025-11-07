@@ -1,4 +1,3 @@
-# ===== Makefile (corrigé) =====
 SHELL := /bin/bash
 .ONESHELL:
 .SHELLFLAGS := -eu -o pipefail -c
@@ -6,31 +5,17 @@ SHELL := /bin/bash
 VERSION      ?= v0.1.0
 BRANCH_DEV   ?= dev
 BRANCH_MAIN  ?= main
+REMOTE       ?= origin
 
-.PHONY: help release commit push merge tag test changelog preflight ensure-clean ensure-branch install_gitleaks
-
-help:
-	@echo "Available commands:"
-	@echo "  make commit                        - Add and commit all files (on $(BRANCH_DEV) branch)"
-	@echo "  make push                          - Push the $(BRANCH_DEV) branch"
-	@echo "  make merge                         - Merge $(BRANCH_DEV) into $(BRANCH_MAIN)"
-	@echo "  make tag VERSION=vX.Y.Z           - Create and push a Git tag (default: $(VERSION))"
-	@echo "  make release VERSION=vX.Y.Z       - Full release: preflight + commit + push + merge + tag"
-	@echo "  make test                          - Compile and run tests"
-	@echo "  make changelog                     - Update CHANGELOG.md using script"
-
-# ---------- Safety helpers ----------
-ensure-branch:
-	@if [ "$$(git rev-parse --abbrev-ref HEAD)" != "$(BRANCH_DEV)" ]; then \
-		echo "❌ You must be on $(BRANCH_DEV) to commit."; \
-		exit 1; \
+# ---- Utilitaire: forcer SSH pour GitHub (si HTTPS) ----
+force_ssh_remote:
+	@url="$$(git remote get-url $(REMOTE))"; \
+	if [[ "$$url" =~ ^https://github.com/ ]]; then \
+		echo "🔐 Switching remote to SSH..."; \
+		git remote set-url $(REMOTE) "$$(echo "$$url" | sed 's#https://github.com/#git@github.com:#')"; \
 	fi
-
-ensure-clean:
-	@if [ -n "$$(git status --porcelain)" ]; then \
-		echo "❌ Working tree not clean. Commit or stash first."; \
-		exit 1; \
-	fi
+	@echo "Remote $(REMOTE): $$(git remote get-url $(REMOTE))"
+	@ssh -T git@github.com >/dev/null 2>&1 || true
 
 # ---------- Tools ----------
 install_gitleaks:
@@ -47,19 +32,33 @@ install_gitleaks:
 	fi
 	@gitleaks version
 
-# ---------- Preflight (runs before release) ----------
-preflight: install_gitleaks
+# ---------- Preflight ----------
+preflight: install_gitleaks force_ssh_remote
 	@echo "🔎 Preflight: secrets & branches..."
 	@gitleaks detect --source . --no-banner --redact
 	@echo "✅ Secrets check passed"
 	@echo "🔎 Sync $(BRANCH_DEV) & $(BRANCH_MAIN) ..."
-	git fetch origin
+	git fetch $(REMOTE)
 	git checkout $(BRANCH_DEV)
-	git pull --rebase origin $(BRANCH_DEV)
-	@git show-ref --verify --quiet refs/heads/$(BRANCH_MAIN) || git branch $(BRANCH_MAIN) origin$(BRANCH_MAIN)
+	git pull --rebase $(REMOTE) $(BRANCH_DEV)
+	# bugfix: slash manquant
+	@git show-ref --verify --quiet refs/heads/$(BRANCH_MAIN) || git branch $(BRANCH_MAIN) $(REMOTE)/$(BRANCH_MAIN)
 	git checkout $(BRANCH_MAIN)
-	git pull --rebase origin $(BRANCH_MAIN)
+	git pull --rebase $(REMOTE) $(BRANCH_MAIN)
 	git checkout $(BRANCH_DEV)
+
+# ---------- Safety helpers ----------
+ensure-branch:
+	@if [ "$$(git rev-parse --abbrev-ref HEAD)" != "$(BRANCH_DEV)" ]; then \
+		echo "❌ You must be on $(BRANCH_DEV) to commit."; \
+		exit 1; \
+	fi
+
+ensure-clean:
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "❌ Working tree not clean. Commit or stash first."; \
+		exit 1; \
+	fi
 
 # ---------- Core flow ----------
 commit: ensure-branch
@@ -71,16 +70,26 @@ commit: ensure-branch
 		echo "✅ Nothing to commit."; \
 	fi
 
-push:
-	git push origin $(BRANCH_DEV)
+push: force_ssh_remote
+	# push dev avec retries
+	tries=0; until git push $(REMOTE) $(BRANCH_DEV); do \
+		tries=$$((tries+1)); \
+		if [ $$tries -ge 5 ]; then echo "❌ push $(BRANCH_DEV) failed after $$tries tries"; exit 128; fi; \
+		echo "⏳ Retry $$tries..."; sleep 3; \
+	done
 
-merge:
+merge: force_ssh_remote
 	git checkout $(BRANCH_MAIN)
-	git merge --no-ff --no-edit $(BRANCH_DEV)
-	git push origin $(BRANCH_MAIN)
+	git merge --no-ff --no-edit $(BRANCH_DEV) || true
+	# push main avec retries
+	tries=0; until git push $(REMOTE) $(BRANCH_MAIN); do \
+		tries=$$((tries+1)); \
+		if [ $$tries -ge 5 ]; then echo "❌ push $(BRANCH_MAIN) failed after $$tries tries"; exit 128; fi; \
+		echo "⏳ Retry $$tries..."; sleep 3; \
+	done
 	git checkout $(BRANCH_DEV)
 
-tag:
+tag: force_ssh_remote
 	@if ! [[ "$(VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$$ ]]; then \
 		echo "❌ VERSION must look like vX.Y.Z (got '$(VERSION)')"; exit 1; \
 	fi
@@ -89,11 +98,15 @@ tag:
 	fi
 	@echo "🏷️  Creating annotated tag $(VERSION)..."
 	git tag -a $(VERSION) -m "chore(release): $(VERSION)"
-	git push origin $(VERSION)
+	# push tag avec retries
+	tries=0; until git push $(REMOTE) $(VERSION); do \
+		tries=$$((tries+1)); \
+		if [ $$tries -ge 5 ]; then echo "❌ push tag $(VERSION) failed after $$tries tries"; exit 128; fi; \
+		echo "⏳ Retry $$tries..."; sleep 3; \
+	done
 
 release: preflight commit ensure-clean push merge tag
 
-# ---------- Misc ----------
 test:
 	@if [ -d build ]; then cd build && ctest --output-on-failure; else echo "ℹ️ No build dir; skipping tests"; fi
 
