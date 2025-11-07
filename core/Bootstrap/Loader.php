@@ -10,24 +10,49 @@ final class Loader
 {
     public static function bootstrap(string $baseDir): void
     {
+        self::prepareEnvFile($baseDir);
         self::loadEnv($baseDir);
         self::defineConstants($baseDir);
         self::configureCloudinary();
     }
 
+    /**
+     * Si aucun .env n'existe, on copie .env.example
+     */
+    private static function prepareEnvFile(string $baseDir): void
+    {
+        $envPath       = $baseDir . '/.env';
+        $examplePath   = $baseDir . '/.env.example';
+
+        if (!is_file($envPath) && is_file($examplePath)) {
+            @copy($examplePath, $envPath);
+            echo "[IVI] Copied .env.example → .env\n";
+        }
+    }
+
+    /**
+     * Chargement du fichier .env (ou .env.{APP_ENV})
+     */
     private static function loadEnv(string $baseDir): void
     {
         $envFile = '.env';
-        if (!empty($_SERVER['APP_ENV'])) {
-            $candidate = ".env.{$_SERVER['APP_ENV']}";
+        $envFromServer = $_SERVER['APP_ENV'] ?? $_ENV['APP_ENV'] ?? null;
+
+        if ($envFromServer) {
+            $candidate = ".env.{$envFromServer}";
             if (is_file($baseDir . DIRECTORY_SEPARATOR . $candidate)) {
                 $envFile = $candidate;
             }
         }
+
+        // safeLoad() ne jette pas d’exception si le fichier est absent
         $dotenv = Dotenv::createImmutable($baseDir, $envFile);
-        $dotenv->load();
+        $dotenv->safeLoad();
     }
 
+    /**
+     * Définitions de constantes globales
+     */
     private static function defineConstants(string $baseDir): void
     {
         defined('BASE_PATH') || define('BASE_PATH', $baseDir);
@@ -35,6 +60,9 @@ final class Loader
         defined('APP_ENV')   || define('APP_ENV', $_ENV['APP_ENV'] ?? 'prod');
     }
 
+    /**
+     * Configuration automatique de Cloudinary si présent
+     */
     private static function configureCloudinary(): void
     {
         if (!class_exists(\Cloudinary\Configuration\Configuration::class)) {
@@ -47,7 +75,6 @@ final class Loader
             'api_secret' => $_ENV['CLOUDINARY_API_SECRET'] ?? '',
         ];
 
-        // Si rien n’est configuré, on ne fait rien
         if ($cloud['cloud_name'] === '' || $cloud['api_key'] === '' || $cloud['api_secret'] === '') {
             return;
         }
