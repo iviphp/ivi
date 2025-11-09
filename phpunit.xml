@@ -1,36 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  =============================================================================
-  PHPUnit Configuration — Ivi Framework
-  =============================================================================
-
-  This configuration file defines the testing environment for the Ivi Framework.
-  It ensures that all tests are executed consistently, with an isolated runtime,
-  colorized output, and strict control over environment variables.
-
-  ## Responsibilities
-  - Bootstrap the framework using `tests/bootstrap.php`.
-  - Register all test suites located under the `/tests` directory.
-  - Restrict code coverage and analysis to the `core/` and `src/` directories.
-  - Automatically load environment variables with `APP_ENV=testing`.
-
-  ## Design Notes
-  - Compatible with PHPUnit ≥ 10.5 (XSD schema validation enabled).
-  - Safe defaults: warnings do not fail tests, caching improves performance.
-  - The testing environment is isolated from production by design.
-
-  ## Example Usage
-  Run the test suite locally:
-      vendor/bin/phpunit
-
-  Or run a specific test class:
-      vendor/bin/phpunit --filter=HelpersTest
-
-  @package   Ivi\Tests
-  @category  Configuration
-  @version   1.0.0
-  @since     Ivi Framework v1.1
--->
 <phpunit
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/10.5/phpunit.xsd"
@@ -49,6 +17,7 @@
     <include>
       <directory>core</directory>
       <directory>src</directory>
+      <directory>modules</directory>
     </include>
   </source>
 
