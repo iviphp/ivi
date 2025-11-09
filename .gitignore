@@ -70,3 +70,8 @@ gitleaks-report.json
 node_modules/
 dist/
 build/
+.phpunit.cache
+
+# public/modules
+public/modules/*
+!public/modules/.gitignore

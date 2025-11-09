@@ -72,6 +72,20 @@ abstract class Controller
 {
     /** @var string Default layout file (relative to /views directory). */
     protected string $layout = 'base.php';
+    protected static array $layoutVars = [];
+    protected static array $viewNamespaces = [];
+
+    /** Définit une variable de layout disponible dans base.php (ex: 'title') */
+    protected function setLayoutVar(string $key, mixed $value): void
+    {
+        self::$layoutVars[$key] = $value;
+    }
+
+    /** Raccourci pratique pour le titre de page */
+    protected function setPageTitle(string $title): void
+    {
+        $this->setLayoutVar('title', $title);
+    }
 
     /**
      * Render a view file into a full HTML response.
@@ -98,8 +112,9 @@ abstract class Controller
         ?string $layoutOverride = null,
         int $status = 200
     ): HtmlResponse {
-        $viewsDir = $this->viewsBasePath();
-        $filePath = $viewsDir . $this->dotToPath($path) . '.php';
+        // au lieu de $filePath = $viewsDir . $this->dotToPath($path) . '.php';
+        [$baseForView, $fileRel] = $this->resolveViewPath($path);
+        $filePath = $baseForView . $fileRel;
 
         if (!is_file($filePath)) {
             throw new ViewNotFoundException($filePath);
@@ -117,19 +132,26 @@ abstract class Controller
         }
 
         $layout = $layoutOverride ?? $this->layout;
-        $layoutPath = $viewsDir . $layout;
-
+        $layoutPath = $this->viewsBasePath() . $layout;
         if (!is_file($layoutPath)) {
             return new HtmlResponse($content, $status);
         }
 
         $full = $this->capture(function () use ($layoutPath, $content, $params) {
-            if (is_array($params)) {
-                extract($params, EXTR_SKIP);
+            if (!empty(self::$layoutVars)) {
+                extract(self::$layoutVars, EXTR_OVERWRITE);
             }
+
+            if (is_array($params)) {
+                extract($params, EXTR_OVERWRITE);
+            }
+
+            if (!isset($title) || $title === null || $title === '') {
+                $title = 'ivi.php';
+            }
+
             require $layoutPath;
         });
-
         return new HtmlResponse($full, $status);
     }
 
@@ -261,5 +283,50 @@ abstract class Controller
             $out = ob_get_clean();
         }
         return $out ?: '';
+    }
+
+
+    /** Enregistre un namespace de vues, ex: Controller::addViewNamespace('market', '/abs/path/to/views') */
+    public static function addViewNamespace(string $ns, string $path): void
+    {
+        self::$viewNamespaces[$ns] = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+    }
+
+    /** Résout un chemin de vue, supporte "ns::path.to.view" et "path.to.view" */
+    protected function resolveViewPath(string $path): array
+    {
+        // Syntaxe "market::home"
+        if (strpos($path, '::') !== false) {
+            [$ns, $rel] = explode('::', $path, 2);
+            if (isset(self::$viewNamespaces[$ns])) {
+                $base = self::$viewNamespaces[$ns];
+                $file = str_replace('.', DIRECTORY_SEPARATOR, $rel) . '.php';
+                return [$base, $file];
+            }
+        }
+
+        // Syntaxe standard "pages.home"
+        $base = $this->viewsBasePath();
+        $file = $this->dotToPath($path) . '.php';
+        return [$base, $file];
+    }
+
+    /** Comme resolveViewPath() mais pour les layouts (accepte aussi "ns::layout.php") */
+    protected function resolveLayoutPath(string $layout): array
+    {
+        if (strpos($layout, '::') !== false) {
+            [$ns, $rel] = explode('::', $layout, 2);
+            if (isset(self::$viewNamespaces[$ns])) {
+                $base = self::$viewNamespaces[$ns];
+                // on autorise soit "layouts/main", soit "layouts/main.php"
+                $rel = str_ends_with($rel, '.php') ? $rel : ($rel . '.php');
+                $file = str_replace('.', DIRECTORY_SEPARATOR, $rel);
+                return [$base, $file];
+            }
+        }
+
+        $base = $this->viewsBasePath();
+        $file = $layout; // déjà un chemin relatif style "base.php" ou "layouts/main.php"
+        return [$base, $file];
     }
 }

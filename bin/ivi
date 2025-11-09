@@ -13,9 +13,9 @@ declare(strict_types=1);
 $autoloadCandidates = [
     __DIR__ . '/../vendor/autoload.php',                     // package-local (create-project)
     dirname(__DIR__, 2) . '/vendor/autoload.php',            // vendor/bin/ivi -> ../../vendor/autoload.php
-    getenv('COMPOSER_HOME') ? rtrim(getenv('COMPOSER_HOME'), '/') . '/vendor/autoload.php' : null, // composer v2
-    $_SERVER['HOME'] ? rtrim($_SERVER['HOME'], '/') . '/.config/composer/vendor/autoload.php' : null, // composer v2 default
-    $_SERVER['HOME'] ? rtrim($_SERVER['HOME'], '/') . '/.composer/vendor/autoload.php' : null, // composer v1 default
+    getenv('COMPOSER_HOME') ? rtrim((string) getenv('COMPOSER_HOME'), '/') . '/vendor/autoload.php' : null, // composer v2
+    isset($_SERVER['HOME']) ? rtrim((string) $_SERVER['HOME'], '/') . '/.config/composer/vendor/autoload.php' : null, // composer v2 default
+    isset($_SERVER['HOME']) ? rtrim((string) $_SERVER['HOME'], '/') . '/.composer/vendor/autoload.php' : null, // composer v1 default
 ];
 $autoload = null;
 foreach ($autoloadCandidates as $c) {
@@ -31,6 +31,98 @@ if (!$autoload) {
 require $autoload;
 
 use Ivi\Core\Console\CommandRunner;
+use Ivi\Core\Migrations\Migrator;
+use Ivi\Core\Seeds\SeederRunner;
+
+/**
+ * Discover module migration paths and (optionally) let modules register config.
+ *
+ * Returns an array of existing migration directories, e.g.:
+ * [
+ *   /.../scripts/migrations,
+ *   /.../modules/Market/Core/database/migrations,
+ *   /.../modules/Blog/Core/database/migrations,
+ * ]
+ */
+function ivi_cli_module_migration_paths(string $baseDir): array
+{
+    $configFile  = $baseDir . '/config/modules.php';
+    $modulesCfg  = is_file($configFile) ? require $configFile : ['modules' => []];
+    $modulesList = $modulesCfg['modules'] ?? [];
+
+    $paths = [];
+
+    // (1) Always include global migrations if present
+    $global = $baseDir . '/scripts/migrations';
+    if (is_dir($global)) {
+        $paths[] = $global;
+    }
+
+    // (2) Load each Module.php (returns an instance) and call register()
+    $modules = [];
+    foreach ($modulesList as $slug) {
+        $moduleFile = $baseDir . "/modules/{$slug}/Module.php";
+        if (is_file($moduleFile)) {
+            /** @var \App\Modules\ModuleContract $m */
+            $m = require $moduleFile;
+            $modules[] = $m;
+        }
+    }
+    foreach ($modules as $m) {
+        try {
+            $m->register(); // safe pre-boot config merge/binds
+        } catch (\Throwable $e) {
+            // keep CLI resilient
+        }
+    }
+
+    // (3) Collect each module's migrations folder if it exists
+    foreach ($modulesList as $slug) {
+        $mig = $baseDir . "/modules/{$slug}/database/migrations";
+        if (is_dir($mig)) {
+            $paths[] = $mig;
+        }
+    }
+
+    // De-dupe while preserving order
+    return array_values(array_unique($paths));
+}
+
+/**
+ * Discover seeder paths for global app and modules.
+ *
+ * Returns an ordered list of existing directories, e.g.:
+ * [
+ *   /.../scripts/seeders,
+ *   /.../modules/Market/Core/database/seeders,
+ *   /.../modules/Blog/Core/database/seeders,
+ * ]
+ */
+function ivi_cli_module_seeder_paths(string $baseDir): array
+{
+    $configFile  = $baseDir . '/config/modules.php';
+    $modulesCfg  = is_file($configFile) ? require $configFile : ['modules' => []];
+    $modulesList = $modulesCfg['modules'] ?? [];
+
+    $paths = [];
+
+    // (1) Global seeders (optional)
+    $global = $baseDir . '/scripts/seeders';
+    if (is_dir($global)) {
+        $paths[] = $global;
+    }
+
+    // (2) Module seeders
+    foreach ($modulesList as $slug) {
+        $seed = $baseDir . "/modules/{$slug}/database/seeders";
+        if (is_dir($seed)) {
+            $paths[] = $seed;
+        }
+    }
+
+    // De-dupe while preserving order
+    return array_values(array_unique($paths));
+}
 
 final class CliBootstrap
 {
@@ -76,7 +168,306 @@ final class CliBootstrap
             exit($code);
         }
 
-        // fallback: commands internes
+        // Seed (global + modules)
+        if (in_array($cmd, ['seed', 'db:seed'], true)) {
+            $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+
+            $paths = ivi_cli_module_seeder_paths($baseDir);
+            if (!$paths) {
+                echo self::badge('INFO', 'yellow') . " No seeder paths found.\n";
+                exit(0);
+            }
+
+            foreach ($paths as $path) {
+                echo self::badge('IVI', 'cyan') . " Seed Path: {$path}\n";
+                try {
+                    (new SeederRunner($path))->run();
+                } catch (\Throwable $e) {
+                    echo self::badge('ERROR', 'red') . " {$e->getMessage()}\n";
+                    exit(1);
+                }
+                echo "\n";
+            }
+            exit(0);
+        }
+
+        // Intercept migration commands: run global + module migrations
+        if (in_array($cmd, ['migrate', 'migrate:status', 'migrate:reset'], true)) {
+            $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+
+            $paths = ivi_cli_module_migration_paths($baseDir);
+            if (!$paths) {
+                echo self::badge('INFO', 'yellow') . " No migration paths found.\n";
+                exit(0);
+            }
+
+            foreach ($paths as $path) {
+                echo self::badge('IVI', 'cyan') . " Path: {$path}\n";
+                $migrator = new Migrator($path);
+
+                switch ($cmd) {
+                    case 'migrate':
+                        $migrator->migrate();
+                        break;
+                    case 'migrate:status':
+                        $migrator->status();
+                        break;
+                    case 'migrate:reset':
+                        $migrator->reset();
+                        break;
+                }
+                echo "\n";
+            }
+            exit(0);
+        }
+
+        // modules:publish-assets [--copy] [--force]
+        if ($cmd === 'modules:publish-assets') {
+            $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+            $modsDir = $baseDir . '/modules';
+            $pubRoot = $baseDir . '/public/modules';
+            $copy    = in_array('--copy', $argv, true);
+            $force   = in_array('--force', $argv, true);
+
+            $isWindows = (DIRECTORY_SEPARATOR === '\\');
+
+            if (!is_dir($modsDir)) {
+                fwrite(STDERR, "[ERROR] No modules/ directory.\n");
+                exit(1);
+            }
+            @mkdir($pubRoot, 0775, true);
+
+            // ✅ Important: SELF_FIRST pour voir aussi les dossiers (dont "public")
+            $rii = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($modsDir, FilesystemIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
+
+            $published = [];
+
+            foreach ($rii as $file) {
+                if (!$file->isDir() || strtolower($file->getFilename()) !== 'public') {
+                    continue;
+                }
+
+                $modPublic  = $file->getPathname();                                           // .../modules/Vendor/Package/public
+                $packageDir = dirname($modPublic);                                            // .../modules/Vendor/Package
+                $rel        = str_replace($modsDir . DIRECTORY_SEPARATOR, '', $packageDir);   // Vendor/Package
+                $targetDir  = $pubRoot . '/' . $rel;                                          // .../public/modules/Vendor/Package
+                @mkdir(dirname($targetDir), 0775, true);
+
+                // --force : supprimer lien/dossier existant mal pointé
+                if ($force && (is_link($targetDir) || is_dir($targetDir))) {
+                    $rmCmd = sprintf('rm -rf %s', escapeshellarg($targetDir));
+                    if ($isWindows) {
+                        $rmCmd = 'powershell -Command "Remove-Item -Recurse -Force ' . str_replace('"', '\"', $targetDir) . '"';
+                    }
+                    exec($rmCmd, $_, $rmCode);
+                    if ($rmCode !== 0 && file_exists($targetDir)) {
+                        echo "[warn] Could not remove existing: $targetDir\n";
+                    }
+                }
+
+                if (is_link($targetDir) || is_dir($targetDir)) {
+                    echo "[skip] $targetDir\n";
+                    continue;
+                }
+
+                // Stratégie : symlink par défaut (rapide), sinon copie
+                $doCopy = $copy || $isWindows;
+
+                if (!$doCopy) {
+                    // Lien relatif: .../public/modules/Vendor/Package -> ../../../modules/Vendor/Package/public
+                    $relative = '../../../modules/' . $rel . '/public';
+                    if (@symlink($relative, $targetDir)) {
+                        echo "[link] $targetDir -> $relative\n";
+                        $published[] = $rel;
+                        continue;
+                    }
+                    // symlink impossible → on bascule en copie
+                    $doCopy = true;
+                }
+
+                // Copie récursive (essai via cp -R, sinon fallback PHP)
+                $copied = false;
+
+                // 1) cp -R (rapide si dispo)
+                $cpCmd = sprintf('cp -R %s %s', escapeshellarg($modPublic), escapeshellarg($targetDir));
+                exec($cpCmd, $_, $cpCode);
+                if ($cpCode === 0 && is_dir($targetDir)) {
+                    echo "[copy] $targetDir\n";
+                    $published[] = $rel;
+                    $copied = true;
+                }
+
+                // 2) Fallback pur PHP (sans getSubPathName)
+                if (!$copied) {
+                    /** @var \RecursiveIteratorIterator<\RecursiveDirectoryIterator> $it */
+                    $it = new RecursiveIteratorIterator(
+                        new RecursiveDirectoryIterator($modPublic, FilesystemIterator::SKIP_DOTS),
+                        RecursiveIteratorIterator::SELF_FIRST
+                    );
+
+                    @mkdir($targetDir, 0775, true);
+
+                    $base = rtrim($modPublic, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+                    $baseLen = strlen($base);
+
+                    foreach ($it as $src) {
+                        /** @var \SplFileInfo $src */
+                        $full    = $src->getPathname();
+                        // chemin relatif depuis .../public/
+                        $subPath = substr($full, $baseLen);
+                        $dest    = $targetDir . DIRECTORY_SEPARATOR . $subPath;
+
+                        if ($src->isDir()) {
+                            @mkdir($dest, 0775, true);
+                        } else {
+                            @mkdir(dirname($dest), 0775, true);
+                            @copy($full, $dest);
+                        }
+                    }
+
+                    if (is_dir($targetDir)) {
+                        echo "[copy] $targetDir (php)\n";
+                        $published[] = $rel;
+                    } else {
+                        echo "[error] failed to publish $rel\n";
+                    }
+                }
+            }
+
+            echo "Published: " . ($published ? implode(', ', $published) : '(none)') . PHP_EOL;
+            exit(0);
+        }
+
+        // ivi deploy [--dev] [--force] [--no-install]
+        if ($cmd === 'deploy') {
+            $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+            $phpBin  = PHP_BINARY ?: 'php';
+
+            $useDev  = in_array('--dev', $argv, true);        // installer require-dev aussi
+            $force   = in_array('--force', $argv, true);      // forcer la republie des assets
+            $noInst  = in_array('--no-install', $argv, true); // sauter l'étape composer install
+
+            // Détection de composer (global ou local .phar)
+            $composer = trim((string) @shell_exec('command -v composer')) ?: '';
+            if ($composer === '' || !is_executable($composer)) {
+                $composerPhar = $baseDir . '/composer.phar';
+                if (is_file($composerPhar)) {
+                    $composer = $phpBin . ' ' . escapeshellarg($composerPhar);
+                } else {
+                    echo self::badge('WARN', 'yellow') . " Composer not found. Skipping install.\n";
+                    $noInst = true;
+                }
+            }
+
+            // 0) .env minimal si absent (facultatif)
+            $envFile = $baseDir . '/.env';
+            $envEx   = $baseDir . '/.env.example';
+            if (!is_file($envFile) && is_file($envEx)) {
+                @copy($envEx, $envFile);
+                echo self::badge('IVI', 'cyan') . " Copied .env from .env.example\n";
+            }
+
+            // 1) Composer install (sauf --no-install)
+            if (!$noInst) {
+                $flags = [
+                    '--prefer-dist',
+                    '--optimize-autoloader',
+                    '--no-interaction',
+                    '--no-progress',
+                ];
+                if (!$useDev) {
+                    $flags[] = '--no-dev';
+                }
+
+                $cmdLine = $composer . ' install ' . implode(' ', $flags);
+                echo self::badge('IVI', 'cyan') . " Composer install\n";
+                passthru($cmdLine, $code);
+                if ($code !== 0) {
+                    echo self::badge('ERROR', 'red') . " composer install failed (code $code)\n";
+                    exit($code);
+                }
+
+                echo self::badge('IVI', 'cyan') . " Composer dump-autoload -o\n";
+                passthru($composer . ' dump-autoload -o', $code);
+                if ($code !== 0) {
+                    echo self::badge('ERROR', 'red') . " composer dump-autoload failed (code $code)\n";
+                    exit($code);
+                }
+            }
+
+            // 2) Publication des assets modules (copie physique, compatible mutualisé)
+            $pubFlags = ['modules:publish-assets', '--copy'];
+            if ($force) {
+                $pubFlags[] = '--force';
+            }
+            echo self::badge('IVI', 'cyan') . " Publish module assets (" . implode(' ', $pubFlags) . ")\n";
+            passthru($phpBin . ' ' . escapeshellarg($baseDir . '/bin/ivi') . ' ' . implode(' ', $pubFlags), $code);
+            if ($code !== 0) {
+                echo self::badge('ERROR', 'red') . " assets publish failed (code $code)\n";
+                exit($code);
+            }
+
+            // 3) Petite vérif basique d’accessibilité (facultatif)
+            $pubDir = $baseDir . '/public/modules';
+            if (is_dir($pubDir)) {
+                echo self::badge('OK', 'green') . " Public modules ready: {$pubDir}\n";
+            } else {
+                echo self::badge('WARN', 'yellow') . " Public modules directory missing: {$pubDir}\n";
+            }
+
+            echo self::badge('DONE', 'green') . " Deploy finished.\n";
+            echo self::badge('TIP', 'yellow') . " Serve locally: php -S 127.0.0.1:8000 -t public\n";
+            exit(0);
+        }
+
+        // ivi serve:run [--host=127.0.0.1] [--port=8000] [--docroot=public]
+        if ($cmd === 'serve:run') {
+            $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+
+            // Valeurs par défaut
+            $host = '127.0.0.1';
+            $port = '8000';
+            $docroot = $baseDir . '/public';
+
+            // Parsing simple des options
+            foreach (array_slice($argv, 2) as $arg) {
+                if (str_starts_with($arg, '--host=')) {
+                    $host = substr($arg, 7);
+                } elseif (str_starts_with($arg, '--port=')) {
+                    $port = substr($arg, 7);
+                } elseif (str_starts_with($arg, '--docroot=')) {
+                    $docroot = realpath(substr($arg, 10)) ?: $docroot;
+                }
+            }
+
+            if (!is_dir($docroot)) {
+                echo self::badge('ERROR', 'red') . " Docroot not found: {$docroot}\n";
+                exit(1);
+            }
+
+            $url = "http://{$host}:{$port}";
+            echo self::badge('IVI', 'cyan') . " Serving {$docroot}\n";
+            echo self::badge('OK', 'green') . " Running on {$url}\n";
+            echo self::badge('TIP', 'yellow') . " Stop with Ctrl+C\n\n";
+
+            // Commande serveur PHP natif
+            $cmdLine = sprintf(
+                '%s -S %s:%s -t %s',
+                escapeshellcmd(PHP_BINARY),
+                escapeshellarg($host),
+                escapeshellarg($port),
+                escapeshellarg($docroot)
+            );
+
+            // Lance le serveur
+            passthru($cmdLine);
+            exit(0);
+        }
+
+        // fallback: internal commands
         (new CommandRunner())->run($argv);
     }
 }

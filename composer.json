@@ -19,7 +19,9 @@
       "App\\": "src/"
     },
     "files": [
-      "core/Support/Helpers.php"
+      "core/Support/Helpers.php",
+      "support/ide-stubs.php",
+      "support/modules_autoload.php"
     ]
   },
   "bin": [
@@ -42,7 +44,15 @@
   "scripts": {
     "serve": "php -S 127.0.0.1:8000 -t public",
     "test": "vendor/bin/phpunit",
-    "lint": "vendor/bin/php-cs-fixer fix --allow-risky=yes"
+    "lint": "vendor/bin/php-cs-fixer fix --allow-risky=yes",
+    "coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit",
+    "deploy": "@php bin/ivi deploy",
+    "post-install-cmd": [
+      "@php bin/ivi modules:publish-assets --copy"
+    ],
+    "post-update-cmd": [
+      "@php bin/ivi modules:publish-assets --copy"
+    ]
   },
   "config": {
     "process-timeout": 0,
