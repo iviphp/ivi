@@ -1,65 +1,66 @@
 {
-  "name": "iviphp/ivi",
-  "description": "ivi.php — Simple. Modern. Expressive.",
-  "type": "project",
-  "license": "MIT",
-  "authors": [
-    {
-      "name": "Gaspard Kirira",
-      "email": "gaspardkirira@outlook.com"
-    }
-  ],
-  "autoload": {
-    "psr-4": {
-      "Ivi\\Core\\": "core/",
-      "Ivi\\Http\\": "core/Http/",
-      "Ivi\\Config\\": "config/",
-      "Ivi\\Support\\": "support/",
-      "Ivi\\Router\\": "router/",
-      "App\\": "src/"
-    },
-    "files": [
-      "core/Support/Helpers.php",
-      "support/ide-stubs.php",
-      "support/modules_autoload.php"
-    ]
-  },
-  "bin": [
-    "bin/ivi"
-  ],
-  "require": {
-    "php": ">=8.1",
-    "vlucas/phpdotenv": "^5.6",
-    "symfony/var-dumper": "^7.0",
-    "firebase/php-jwt": "^6.11",
-    "predis/predis": "^3.0",
-    "ext-json": "*",
-    "cloudinary/cloudinary_php": "^2",
-    "erusev/parsedown": "^1.7"
-  },
-  "require-dev": {
-    "phpunit/phpunit": "^10.0",
-    "friendsofphp/php-cs-fixer": "^3.0"
-  },
-  "scripts": {
-    "serve": "php -S 127.0.0.1:8000 -t public",
-    "serve:run": "@php bin/ivi serve:run",
-    "test": "vendor/bin/phpunit",
-    "lint": "vendor/bin/php-cs-fixer fix --allow-risky=yes",
-    "coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit",
-    "deploy": "@php bin/ivi deploy",
-    "post-install-cmd": [
-      "@php -r \"file_exists('vendor/bin/ivi') ? passthru('php vendor/bin/ivi modules:publish-assets --copy') : (file_exists('bin/ivi') ? passthru('php bin/ivi modules:publish-assets --copy') : 0);\""
+    "name": "iviphp/ivi",
+    "description": "ivi.php \u2014 Simple. Modern. Expressive.",
+    "type": "project",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Gaspard Kirira",
+            "email": "gaspardkirira@outlook.com"
+        }
     ],
-    "post-update-cmd": [
-      "@php -r \"file_exists('vendor/bin/ivi') ? passthru('php vendor/bin/ivi modules:publish-assets --copy') : (file_exists('bin/ivi') ? passthru('php bin/ivi modules:publish-assets --copy') : 0);\""
-    ]
-  },
-  "config": {
-    "process-timeout": 0,
-    "optimize-autoloader": true,
-    "sort-packages": true
-  },
-  "minimum-stability": "stable",
-  "prefer-stable": true
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/",
+            "Ivi\\Config\\": "config/",
+            "Ivi\\Core\\": "core/",
+            "Ivi\\Http\\": "core/Http/",
+            "Ivi\\Router\\": "router/",
+            "Ivi\\Support\\": "support/",
+            "Tests\\Core\\": "modules/Tests/Core/src/"
+        },
+        "files": [
+            "core/Support/Helpers.php",
+            "support/ide-stubs.php",
+            "support/modules_autoload.php"
+        ]
+    },
+    "bin": [
+        "bin/ivi"
+    ],
+    "require": {
+        "php": ">=8.1",
+        "vlucas/phpdotenv": "^5.6",
+        "symfony/var-dumper": "^7.0",
+        "firebase/php-jwt": "^6.11",
+        "predis/predis": "^3.0",
+        "ext-json": "*",
+        "cloudinary/cloudinary_php": "^2",
+        "erusev/parsedown": "^1.7"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0",
+        "friendsofphp/php-cs-fixer": "^3.0"
+    },
+    "scripts": {
+        "serve": "php -S 127.0.0.1:8000 -t public",
+        "serve:run": "@php bin/ivi serve:run",
+        "test": "vendor/bin/phpunit",
+        "lint": "vendor/bin/php-cs-fixer fix --allow-risky=yes",
+        "coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit",
+        "deploy": "@php bin/ivi deploy",
+        "post-install-cmd": [
+            "@php -r \"file_exists('vendor/bin/ivi') ? passthru('php vendor/bin/ivi modules:publish-assets --copy') : (file_exists('bin/ivi') ? passthru('php bin/ivi modules:publish-assets --copy') : 0);\""
+        ],
+        "post-update-cmd": [
+            "@php -r \"file_exists('vendor/bin/ivi') ? passthru('php vendor/bin/ivi modules:publish-assets --copy') : (file_exists('bin/ivi') ? passthru('php bin/ivi modules:publish-assets --copy') : 0);\""
+        ]
+    },
+    "config": {
+        "process-timeout": 0,
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
 }
