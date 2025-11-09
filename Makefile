@@ -160,7 +160,16 @@ release: ensure-branch force_ssh_remote check_secrets commit preflight ensure-cl
 
 # ---------------- Extras ----------------
 test:
-	@if [ -d build ]; then cd build && ctest --output-on-failure; else echo "ℹ️ No build dir; skipping tests"; fi
+	@composer test
+
+coverage:
+	@XDEBUG_MODE=coverage vendor/bin/phpunit
+
+publish-mods:
+	php bin/ivi modules:publish-assets
+
+publish-mods-force:
+	php bin/ivi modules:publish-assets --force
 
 changelog:
 	@bash scripts/update_changelog.sh || true

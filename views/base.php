@@ -9,8 +9,8 @@
     <?= $meta ?? '' ?>
 
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="<?= asset('assets/favicon/favicon.png') ?>">
-    <link rel="apple-touch-icon" href="<?= asset('assets/favicon/favicon.png') ?>">
+    <link rel="icon" href="<?= $favicon ?? asset('assets/favicon/favicon.png') ?>">
+    <link rel="stylesheet" href="<?= $css ?? asset('assets/css/app.css') ?>">
     <meta name="theme-color" content="#008037">
 
     <!-- Global CSS -->

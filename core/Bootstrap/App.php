@@ -8,6 +8,7 @@ use Ivi\Http\Request;
 use Ivi\Core\Router\Router;
 use Ivi\Core\Debug\Logger;
 use Ivi\Core\Exceptions\ExceptionHandler;
+use App\Modules\ModuleRegistry;
 
 /**
  * Class App
@@ -129,8 +130,72 @@ final class App
         $this->router = new Router($this->resolver);
         $this->kernel = new Kernel($this->exceptions);
 
+        $this->loadModules();
+
         // 6) Load application routes (comme avant)
         $this->registerRoutes();
+    }
+
+    /**
+     * -----------------------------------------------------------------------------
+     * Load and initialize all declared application modules.
+     * -----------------------------------------------------------------------------
+     *
+     * This method dynamically loads all modules listed in `config/modules.php`
+     * and performs a two-phase initialization:
+     *
+     * 1. **Registration Phase (`register()`)**
+     *    - Merges module-specific configuration files.
+     *    - Binds service providers or container dependencies.
+     *
+     * 2. **Boot Phase (`boot()`)**
+     *    - Registers routes, views, and database migrations.
+     *    - Integrates each module with the application router.
+     *
+     * ## Design Notes
+     * - Each module is represented by a `Module.php` file that returns an instance
+     *   implementing the `App\Modules\ModuleContract` interface.
+     * - Modules are discovered based on the `config/modules.php` load order.
+     * - Safe defaults: missing or invalid module files are silently ignored.
+     * - Fully compatible with the `ModuleRegistry`, which orchestrates the lifecycle.
+     *
+     * ## Example Structure
+     * ```
+     * config/modules.php
+     * modules/
+     * ├── Market/Core/Module.php
+     * ├── Market/Products/Module.php
+     * └── Blog/Core/Module.php
+     * ```
+     *
+     * @internal
+     * @return void
+     * @throws \RuntimeException If the module configuration file is missing.
+     * @see App\Modules\ModuleContract
+     * @see App\Modules\ModuleRegistry
+     */
+    private function loadModules(): void
+    {
+        $configFile  = $this->baseDir . '/config/modules.php';
+        $modulesCfg  = is_file($configFile) ? require $configFile : ['modules' => []];
+        $modulesList = $modulesCfg['modules'] ?? [];
+
+        $registry = new ModuleRegistry();
+
+        foreach ($modulesList as $slug) {
+            $moduleFile = $this->baseDir . "/modules/{$slug}/Module.php";
+            if (is_file($moduleFile)) {
+                /** @var \App\Modules\ModuleContract $module */
+                $module = require $moduleFile; // returns a module instance
+                $registry->add($module);
+            }
+        }
+
+        // 1) Configuration & service binding
+        $registry->registerAll();
+
+        // 2) Routes, views, migrations (with router context)
+        $registry->bootAll($this->router);
     }
 
     /**

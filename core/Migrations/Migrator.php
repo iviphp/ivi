@@ -104,8 +104,10 @@ final class Migrator
 
             // Some databases auto-commit DDL statements.
             // We guard commit/rollback calls with inTransaction().
-            $pdo->beginTransaction();
             $hadTx = $pdo->inTransaction();
+            if (!$hadTx) {
+                $pdo->beginTransaction();
+            }
 
             try {
                 $pdo->exec($sql);
