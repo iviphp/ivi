@@ -43,15 +43,16 @@
   },
   "scripts": {
     "serve": "php -S 127.0.0.1:8000 -t public",
+    "serve:run": "@php bin/ivi serve:run",
     "test": "vendor/bin/phpunit",
     "lint": "vendor/bin/php-cs-fixer fix --allow-risky=yes",
     "coverage": "XDEBUG_MODE=coverage vendor/bin/phpunit",
     "deploy": "@php bin/ivi deploy",
     "post-install-cmd": [
-      "@php bin/ivi modules:publish-assets --copy"
+      "@php -r \"file_exists('vendor/bin/ivi') ? passthru('php vendor/bin/ivi modules:publish-assets --copy') : (file_exists('bin/ivi') ? passthru('php bin/ivi modules:publish-assets --copy') : 0);\""
     ],
     "post-update-cmd": [
-      "@php bin/ivi modules:publish-assets --copy"
+      "@php -r \"file_exists('vendor/bin/ivi') ? passthru('php vendor/bin/ivi modules:publish-assets --copy') : (file_exists('bin/ivi') ? passthru('php bin/ivi modules:publish-assets --copy') : 0);\""
     ]
   },
   "config": {
