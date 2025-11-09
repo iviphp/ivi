@@ -425,35 +425,91 @@ final class CliBootstrap
 
         // ivi serve:run [--host=127.0.0.1] [--port=8000] [--docroot=public]
         if ($cmd === 'serve:run') {
-            $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+            /**
+             * ============================================================================
+             * Ivi — Dev Server (serve:run)
+             * ============================================================================
+             *
+             * Smart dev server that prefers the caller's project (CWD) over the global
+             * Composer package. If it finds a valid app (public/index.php) in the current
+             * working directory, it serves that. Otherwise, it falls back to the global
+             * package docroot. Users can always override with --docroot=...
+             *
+             * Order of resolution (docroot):
+             *  1) Explicit --docroot=... (if provided and valid)
+             *  2) Current working directory/public  (if contains index.php)
+             *  3) Parent of CWD/public              (useful when run from ./bin)
+             *  4) Package baseDir/public            (global fallback)
+             *
+             * Notes:
+             *  - Prints which docroot is chosen and why.
+             *  - Keeps classic flags: --host, --port, --docroot
+             * ============================================================================
+             */
 
-            // Valeurs par défaut
+            // Package base (global fallback)
+            $packageBase = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+
+            // Defaults
             $host = '127.0.0.1';
             $port = '8000';
-            $docroot = $baseDir . '/public';
+            $docroot = null;
+            $reason  = '';
 
-            // Parsing simple des options
+            // Parse options
             foreach (array_slice($argv, 2) as $arg) {
                 if (str_starts_with($arg, '--host=')) {
                     $host = substr($arg, 7);
                 } elseif (str_starts_with($arg, '--port=')) {
                     $port = substr($arg, 7);
                 } elseif (str_starts_with($arg, '--docroot=')) {
-                    $docroot = realpath(substr($arg, 10)) ?: $docroot;
+                    $candidate = realpath(substr($arg, 10));
+                    if ($candidate && is_dir($candidate)) {
+                        $docroot = $candidate;
+                        $reason  = 'explicit --docroot';
+                    }
                 }
             }
 
-            if (!is_dir($docroot)) {
-                echo self::badge('ERROR', 'red') . " Docroot not found: {$docroot}\n";
+            // Helper to validate a docroot (must have index.php)
+            $isValidDocroot = static function (string $path): bool {
+                return is_dir($path) && is_file(rtrim($path, '/\\') . '/index.php');
+            };
+
+            // Auto-detect only if --docroot not provided or invalid
+            if ($docroot === null || !$isValidDocroot($docroot)) {
+                $cwd = getcwd() ?: '.';
+
+                $candidates = [
+                    [$cwd . '/public',            'CWD/public'],
+                    [dirname($cwd) . '/public',   'parent/public'],  // useful if run from ./bin
+                    [$packageBase . '/public',    'global package fallback'],
+                ];
+
+                foreach ($candidates as [$path, $why]) {
+                    $real = realpath($path) ?: $path;
+                    if ($isValidDocroot($real)) {
+                        $docroot = $real;
+                        $reason  = $why;
+                        break;
+                    }
+                }
+            }
+
+            if (!$docroot) {
+                echo self::badge('ERROR', 'red') . " No valid docroot found.\n";
+                echo "Tried current project and global package.\n";
+                echo "Tip: run from your app root (where public/index.php exists) or pass --docroot=/path/to/public\n";
                 exit(1);
             }
 
             $url = "http://{$host}:{$port}";
             echo self::badge('IVI', 'cyan') . " Serving {$docroot}\n";
             echo self::badge('OK', 'green') . " Running on {$url}\n";
+            echo self::badge('TIP', 'yellow') . " Chosen via: {$reason}\n";
             echo self::badge('TIP', 'yellow') . " Stop with Ctrl+C\n\n";
 
-            // Commande serveur PHP natif
+            // Native PHP server command
             $cmdLine = sprintf(
                 '%s -S %s:%s -t %s',
                 escapeshellcmd(PHP_BINARY),
@@ -462,10 +518,10 @@ final class CliBootstrap
                 escapeshellarg($docroot)
             );
 
-            // Lance le serveur
             passthru($cmdLine);
             exit(0);
         }
+
 
         // fallback: internal commands
         (new CommandRunner())->run($argv);
