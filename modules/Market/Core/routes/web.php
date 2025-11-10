@@ -30,7 +30,7 @@
  * @since    Ivi Framework v1.1
  */
 
-use Market\Core\Http\Controllers\HomeController;
+use Modules\Market\Core\Http\Controllers\HomeController;
 use Ivi\Http\JsonResponse;
 
 /** @var \Ivi\Core\Router\Router $router */

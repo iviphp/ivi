@@ -1,6 +1,6 @@
 <?php
 
-namespace Market\Core\Http\Controllers;
+namespace Modules\Market\Core\Http\Controllers;
 
 use App\Controllers\Controller;
 use Ivi\Http\HtmlResponse;

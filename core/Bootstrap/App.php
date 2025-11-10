@@ -183,11 +183,26 @@ final class App
         $registry = new ModuleRegistry();
 
         foreach ($modulesList as $slug) {
-            $moduleFile = $this->baseDir . "/modules/{$slug}/Module.php";
-            if (is_file($moduleFile)) {
+            // Try Module.php at the module root
+            $moduleFileRoot = $this->baseDir . "/modules/{$slug}/Module.php";
+
+            // Try Module.php inside Core/ (legacy format)
+            $moduleFileCore = $this->baseDir . "/modules/{$slug}/Core/Module.php";
+
+            $moduleFile = null;
+            if (is_file($moduleFileRoot)) {
+                $moduleFile = $moduleFileRoot;
+            } elseif (is_file($moduleFileCore)) {
+                $moduleFile = $moduleFileCore;
+            }
+
+            if ($moduleFile) {
                 /** @var \App\Modules\ModuleContract $module */
                 $module = require $moduleFile; // returns a module instance
                 $registry->add($module);
+            } else {
+                // Tolerant behavior: warn if no Module.php is found
+                echo "[WARN] Module '{$slug}' has no Module.php file.\n";
             }
         }
 
