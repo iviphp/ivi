@@ -157,7 +157,7 @@ final class CommandRunner
 
         // Create directory structure
         $dirs = [
-            "{$moduleDir}/Core/src",
+            "{$moduleDir}/Core/Services",
             "{$moduleDir}/Core/tests",
             "{$moduleDir}/Core/config",
             "{$moduleDir}/database/migrations",
