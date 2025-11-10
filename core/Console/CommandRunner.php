@@ -297,7 +297,8 @@ PHP;
 
         /* ------------------- Modules & Composer ------------------- */
         $this->ensureModulesConfig($base, $name);
-        $this->ensureComposerPsr4($base, "{$name}\\Core\\", "modules/{$name}/Core/");
+
+        // $this->ensureComposerPsr4(...);
 
         passthru('composer dump-autoload -o', $code);
 
