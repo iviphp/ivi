@@ -101,7 +101,7 @@ return new class implements ModuleContract {
         }
 
         // Register migrations safely
-        $mig = __DIR__ . '/database/migrations';
+        $mig = __DIR__ . '/Database/Migrations';
         if (is_dir($mig)) {
             if (function_exists('migrations')) {
                 $mgr = migrations();
@@ -124,7 +124,7 @@ return new class implements ModuleContract {
         }
 
         // Seeders (safe fallback registry)
-        $seed = __DIR__ . '/database/seeders';
+        $seed = __DIR__ . '/Database/Seeders';
         if (is_dir($seed)) {
             $GLOBALS['__ivi_seeder_paths'] ??= [];
             if (!in_array($seed, $GLOBALS['__ivi_seeder_paths'], true)) {

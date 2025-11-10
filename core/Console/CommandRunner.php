@@ -152,14 +152,15 @@ final class CommandRunner
             return;
         }
 
-        // Structure de base
+        // Base structure with lowercase assets
         $dirs = [
             "{$moduleDir}/Core/Services",
-            "{$moduleDir}/Core/tests",
-            "{$moduleDir}/Core/config",
-            "{$moduleDir}/Core/database/migrations",
-            "{$moduleDir}/Core/database/seeders",
-            "{$moduleDir}/Core/public",
+            "{$moduleDir}/Core/Tests",
+            "{$moduleDir}/Core/Config",
+            "{$moduleDir}/Core/Database/Migrations",
+            "{$moduleDir}/Core/Database/Seeders",
+            "{$moduleDir}/Core/Public/assets/css",
+            "{$moduleDir}/Core/Public/assets/js",
             "{$moduleDir}/Core/routes",
             "{$moduleDir}/Core/views",
             "{$moduleDir}/Core/Http/Controllers",
@@ -177,7 +178,8 @@ final class CommandRunner
         $serviceContent = <<<PHP
 <?php
 declare(strict_types=1);
-namespace Modules\\{$name}\\Core;
+
+namespace Modules\\{$name}\\Core\Services;
 
 final class {$name}Service
 {
@@ -189,29 +191,78 @@ final class {$name}Service
 PHP;
         file_put_contents($serviceFile, $serviceContent);
 
-        /* ------------------- Module.php ------------------- */
+        /* ------------------- Module.php (implements ModuleContract) ------------------- */
         $modulePhp = "{$moduleDir}/Core/Module.php";
         $moduleContent = <<<PHP
 <?php
-declare(strict_types=1);
-namespace Modules\\{$name};
 
-final class Module
-{
+use App\Modules\ModuleContract;
+use Ivi\Core\Router\Router;
+
+return new class implements ModuleContract {
+    public function name(): string
+    {
+        return '{$name}/Core';
+    }
+
     public function register(): void
     {
-        if (function_exists('config_set')) {
-            config_set('{$name}', ['enabled' => true]);
+        \$path = __DIR__ . '/Config/' . strtolower('{$name}') . '.php';
+        if (is_file(\$path)) {
+            \$cfg = require \$path;
+            \$current = function_exists('config') ? (array) config(strtolower('{$name}'), []) : (array) (\$GLOBALS['__ivi_config'][strtolower('{$name}')] ?? []);
+            \$merged = array_replace_recursive(\$current, (array) \$cfg);
+            if (function_exists('config_set')) {
+                config_set(strtolower('{$name}'), \$merged);
+            } else {
+                \$GLOBALS['__ivi_config'][strtolower('{$name}')] = \$merged;
+            }
         }
     }
-}
 
-return new Module();
+    public function boot(Router \$router): void
+    {
+        \App\Controllers\Controller::addViewNamespace(strtolower('{$name}'), __DIR__ . '/views');
+
+        \$routes = __DIR__ . '/routes/web.php';
+        if (is_file(\$routes)) {
+            require \$routes;
+        }
+
+        \$mig = __DIR__ . '/Database/Migrations';
+        if (is_dir(\$mig)) {
+            if (function_exists('migrations')) {
+                \$mgr = migrations();
+                if (is_object(\$mgr) && method_exists(\$mgr, 'addPath')) {
+                    \$mgr->addPath(\$mig);
+                } else {
+                    \$GLOBALS['__ivi_migration_paths'] ??= [];
+                    if (!in_array(\$mig, \$GLOBALS['__ivi_migration_paths'], true)) {
+                        \$GLOBALS['__ivi_migration_paths'][] = \$mig;
+                    }
+                }
+            } else {
+                \$GLOBALS['__ivi_migration_paths'] ??= [];
+                if (!in_array(\$mig, \$GLOBALS['__ivi_migration_paths'], true)) {
+                    \$GLOBALS['__ivi_migration_paths'][] = \$mig;
+                }
+            }
+        }
+
+        \$seed = __DIR__ . '/Database/Seeders';
+        if (is_dir(\$seed)) {
+            \$GLOBALS['__ivi_seeder_paths'] ??= [];
+            if (!in_array(\$seed, \$GLOBALS['__ivi_seeder_paths'], true)) {
+                \$GLOBALS['__ivi_seeder_paths'][] = \$seed;
+            }
+        }
+    }
+};
 PHP;
         file_put_contents($modulePhp, $moduleContent);
 
         /* ------------------- Config ------------------- */
-        $configFile = "{$moduleDir}/Core/config/" . strtolower($name) . ".php";
+        $configFile = "{$moduleDir}/Core/Config/" . strtolower($name) . ".php";
         $configContent = <<<PHP
 <?php
 return [
@@ -220,11 +271,20 @@ return [
 PHP;
         file_put_contents($configFile, $configContent);
 
-        /* ------------------- Views ------------------- */
+        /* ------------------- Public assets ------------------- */
+        $cssFile = "{$moduleDir}/Core/Public/assets/css/style.css";
+        $jsFile  = "{$moduleDir}/Core/Public/assets/js/script.js";
+        file_put_contents($cssFile, "/* CSS for {$name} module */\nbody { font-family: sans-serif; }\n");
+        file_put_contents($jsFile, "// JS for {$name} module\nconsole.log('{$name} module loaded');\n");
+
+        /* ------------------- views ------------------- */
         $viewFile = "{$moduleDir}/Core/views/home.php";
         $viewContent = <<<PHP
 <h1>Welcome to {$name} Module</h1>
 <p>This is the default home view for the {$name} module.</p>
+<p>Message from controller: <?= htmlspecialchars(\$message) ?></p>
+<?= \$styles ?? '' ?>
+<?= \$scripts ?? '' ?>
 PHP;
         file_put_contents($viewFile, $viewContent);
 
@@ -258,11 +318,18 @@ class HomeController extends Controller
 {
     public function index(): HtmlResponse
     {
-        \$title = (string) (cfg('{$this->snake($name)}.title', 'Softadastra {$name}') ?: 'Softadastra {$name}');
+        \$title = (string) (cfg(strtolower('{$name}') . '.title', 'Softadastra {$name}') ?: 'Softadastra {$name}');
         \$this->setPageTitle(\$title);
 
-        return \$this->view('{$this->snake($name)}::home', [
-            'title' => \$title,
+        \$message = "Hello from {$name}Controller!";
+        \$styles  = '<link rel="stylesheet" href="' . asset("assets/css/style.css") . '">';
+        \$scripts = '<script src="' . asset("assets/js/script.js") . '" defer></script>';
+
+        return \$this->view(strtolower('{$name}') . '::home', [
+            'title'   => \$title,
+            'message' => \$message,
+            'styles'  => \$styles,
+            'scripts' => \$scripts,
         ]);
     }
 }
@@ -271,7 +338,7 @@ PHP;
 
         /* ------------------- Sample migration & seeder ------------------- */
         $migName = date('YmdHis') . "_create_{$this->snake($name)}_table.sql";
-        $migrationFile = "{$moduleDir}/Core/database/migrations/{$migName}";
+        $migrationFile = "{$moduleDir}/Core/Database/Migrations/{$migName}";
         $migrationSql = <<<SQL
 CREATE TABLE IF NOT EXISTS {$this->snake($name)} (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -282,23 +349,27 @@ CREATE TABLE IF NOT EXISTS {$this->snake($name)} (
 SQL;
         file_put_contents($migrationFile, $migrationSql);
 
-        $seederFile = "{$moduleDir}/Core/database/seeders/{$this->snake($name)}_seeder.php";
+        $seederFile = "{$moduleDir}/Core/Database/Seeders/{$name}Seeder.php";
         $seederPhp = <<<PHP
 <?php
 declare(strict_types=1);
-try {
-    echo "[seed] {$name} ok\\n";
-} catch (\\Throwable \$e) {
-    fwrite(STDERR, "[seed:{$name}] " . \$e->getMessage() . "\\n");
-    exit(1);
+
+namespace Modules\\{$name}\\Core\\Database\\Seeders;
+
+final class {$name}Seeder
+{
+    public function run(): void
+    {
+        echo "[seed] {$name} ok\\n";
+    }
 }
+
+return new {$name}Seeder();
 PHP;
         file_put_contents($seederFile, $seederPhp);
 
-        /* ------------------- Modules & Composer ------------------- */
+        /* ------------------- Update modules config ------------------- */
         $this->ensureModulesConfig($base, $name);
-
-        // $this->ensureComposerPsr4(...);
 
         passthru('composer dump-autoload -o', $code);
 
@@ -308,6 +379,7 @@ PHP;
         echo "  - Seed (optional): ivi seed\n";
         echo "  - Use service: new Modules\\{$name}\\Core\\{$name}Service()\n";
     }
+
 
     /* ---------------------------------------------------------------------- */
     /* UTILS                                                                  */

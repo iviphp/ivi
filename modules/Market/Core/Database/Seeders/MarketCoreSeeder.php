@@ -1,5 +1,6 @@
 <?php
 
+declare(strict_types=1);
 /**
  * -----------------------------------------------------------------------------
  * Seeder: MarketCoreSeeder (PHP)
@@ -15,6 +16,9 @@
  *   - PDO DSN resolved from env (MYSQL_DSN / DB_*), or adjust the constructor.
  * -----------------------------------------------------------------------------
  */
+
+
+namespace Modules\Market\Core\Database\Seeders;
 
 final class MarketCoreSeeder
 {
@@ -97,7 +101,6 @@ final class MarketCoreSeeder
         $pass = $_ENV['MYSQL_PASS'] ?? $_ENV['DB_PASS'] ?? null;
 
         if (!$dsn) {
-            // Fallback DSN (MySQL) — ajuste selon ton infra
             $host = $_ENV['DB_HOST'] ?? '127.0.0.1';
             $db   = $_ENV['DB_NAME'] ?? 'ivi';
             $charset = 'utf8mb4';

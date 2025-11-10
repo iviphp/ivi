@@ -17,7 +17,7 @@
       "Ivi\\Http\\": "core/Http/",
       "Ivi\\Router\\": "router/",
       "Ivi\\Support\\": "support/",
-      "Tests\\Core\\": "modules/Tests/Core/src/"
+      "Modules\\": "modules/"
     },
     "files": [
       "core/Support/Helpers.php",
