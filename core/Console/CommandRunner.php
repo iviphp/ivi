@@ -140,7 +140,11 @@ final class CommandRunner
     /* ---------------------------------------------------------------------- */
     private function generateModule(string $rawName): void
     {
-        $base = \dirname(__DIR__, 2);
+        // Use current working directory as project base when available.
+        // Fall back to the library dir if getcwd() is not suitable.
+        $cwd = getcwd();
+        $libBase = \dirname(__DIR__, 2);
+        $base = is_dir($cwd) && is_writable($cwd) ? $cwd : $libBase;
 
         // Normalize the name to StudlyCase (e.g., blog_posts -> BlogPosts)
         $name = $this->studly($rawName);
