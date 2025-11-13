@@ -70,7 +70,9 @@ final class QueryBuilder
     private array $bindings = [];
     private ?int $limit = null;
     private ?int $offset = null;
-    private ?string $order = null;
+    private array $orders = [];
+    private array $joins = [];
+    protected array $groupBys = [];
 
     /**
      * Create a new query builder instance.
@@ -121,9 +123,9 @@ final class QueryBuilder
     /**
      * Add an ORDER BY clause.
      */
-    public function orderBy(string $order): self
+    public function orderBy(string $column, string $direction = 'ASC'): self
     {
-        $this->order = $order;
+        $this->orders[] = $column . ' ' . strtoupper($direction);
         return $this;
     }
 
@@ -223,14 +225,61 @@ final class QueryBuilder
      *
      * @return array{0:string,1:array<string,mixed>}
      */
-    private function toSelectSql(): array
+    protected function toSelectSql(): array
     {
-        $sql = 'SELECT ' . implode(',', $this->columns) . ' FROM ' . $this->table;
-        $sql .= $this->compileWhere();
-        if ($this->order)  $sql .= ' ORDER BY ' . $this->order;
-        if ($this->limit !== null)  $sql .= ' LIMIT ' . $this->limit;
-        if ($this->offset !== null) $sql .= ' OFFSET ' . $this->offset;
+        $sql = 'SELECT ' . implode(', ', $this->columns) . ' FROM ' . $this->table;
+
+        if (!empty($this->joins)) {
+            $sql .= ' ' . implode(' ', $this->joins);
+        }
+
+        if (!empty($this->wheres)) {
+            $sql .= ' WHERE ' . implode(' AND ', $this->wheres);
+        }
+
+        if (!empty($this->groupBys)) {
+            $sql .= ' GROUP BY ' . implode(', ', $this->groupBys);
+        }
+
+        if (!empty($this->orders)) {
+            $sql .= ' ORDER BY ' . implode(', ', $this->orders);
+        }
+
+        if ($this->limit !== null) {
+            $sql .= ' LIMIT ' . $this->limit;
+        }
+
+        if ($this->offset !== null) {
+            $sql .= ' OFFSET ' . $this->offset;
+        }
+
         return [$sql, $this->bindings];
+    }
+
+    public function join(string $table, string $on, string $type = 'INNER'): self
+    {
+        $this->joins[] = strtoupper($type) . ' JOIN ' . $table . ' ON ' . $on;
+        return $this;
+    }
+
+    public function leftJoin(string $table, string $on): self
+    {
+        return $this->join($table, $on, 'LEFT');
+    }
+
+    public function rightJoin(string $table, string $on): self
+    {
+        return $this->join($table, $on, 'RIGHT');
+    }
+
+    public function groupBy(string|array $columns): self
+    {
+        if (is_array($columns)) {
+            $this->groupBys = array_merge($this->groupBys, $columns);
+        } else {
+            $this->groupBys[] = $columns;
+        }
+        return $this;
     }
 
     /**
