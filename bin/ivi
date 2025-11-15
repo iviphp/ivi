@@ -142,9 +142,23 @@ final class CliBootstrap
         return sprintf("[%s%s%s]", $start, strtoupper($label), $end);
     }
 
+
+    public static function getProjectBaseDir(): string
+    {
+        $cwd = getcwd();
+
+        if (is_dir($cwd . '/modules') && is_dir($cwd . '/public')) {
+            return $cwd;
+        }
+
+        return realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+    }
+
     public static function run(array $argv): void
     {
         $cmd = $argv[1] ?? null;
+
+        $baseDir = self::getProjectBaseDir();
 
         // ivi new <name>
         if ($cmd === 'new') {
@@ -170,7 +184,11 @@ final class CliBootstrap
 
         // Seed (global + modules)
         if (in_array($cmd, ['seed', 'db:seed'], true)) {
-            $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
+            $cwd = getcwd();
+            $baseDir = (is_dir($cwd . '/modules') && is_dir($cwd . '/public'))
+                ? $cwd
+                : (realpath(__DIR__ . '/..') ?: dirname(__DIR__));
+
 
             $paths = ivi_cli_module_seeder_paths($baseDir);
             if (!$paths) {
@@ -193,7 +211,6 @@ final class CliBootstrap
 
         // Intercept migration commands: run global + module migrations
         if (in_array($cmd, ['migrate', 'migrate:status', 'migrate:reset'], true)) {
-            $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
 
             $paths = ivi_cli_module_migration_paths($baseDir);
             if (!$paths) {
@@ -223,7 +240,6 @@ final class CliBootstrap
 
         // modules:publish-assets [--copy] [--force]
         if ($cmd === 'modules:publish-assets') {
-            $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
             $modsDir = $baseDir . '/modules';
             $pubRoot = $baseDir . '/public/modules';
             $copy    = in_array('--copy', $argv, true);
@@ -278,7 +294,9 @@ final class CliBootstrap
 
                 if (!$doCopy) {
                     // Lien relatif: .../public/modules/Vendor/Package -> ../../../modules/Vendor/Package/public
-                    $relative = '../../../modules/' . $rel . '/public';
+                    // $relative = '../../../modules/' . $rel . '/public';
+                    $relative = '../../../modules/' . $rel . '/' . $file->getFilename();
+
                     if (@symlink($relative, $targetDir)) {
                         echo "[link] $targetDir -> $relative\n";
                         $published[] = $rel;
@@ -343,7 +361,6 @@ final class CliBootstrap
 
         // ivi deploy [--dev] [--force] [--no-install]
         if ($cmd === 'deploy') {
-            $baseDir = realpath(__DIR__ . '/..') ?: dirname(__DIR__);
             $phpBin  = PHP_BINARY ?: 'php';
 
             $useDev  = in_array('--dev', $argv, true);        // installer require-dev aussi
