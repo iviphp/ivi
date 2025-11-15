@@ -7,13 +7,29 @@
   cacheDirectory=".phpunit.cache"
   failOnWarning="false"
 >
+
+  <!-- ============================= -->
+  <!-- Test Suites Configuration     -->
+  <!-- ============================= -->
   <testsuites>
-    <testsuite name="Ivi Test Suite">
+
+    <!-- Core Tests: framework, helpers, utilities, etc. -->
+    <testsuite name="Core Tests">
       <directory>tests</directory>
     </testsuite>
+
+    <!-- Module Tests: all module-specific tests in modules/<Vendor>/<Module>/Tests -->
+    <testsuite name="Module Tests">
+      <directory>modules/*/*/Tests</directory>
+    </testsuite>
+
   </testsuites>
 
+  <!-- ============================= -->
+  <!-- Source Code Coverage         -->
+  <!-- ============================= -->
   <source>
+    <!-- Include directories for code coverage analysis -->
     <include>
       <directory>core</directory>
       <directory>src</directory>
@@ -21,7 +37,13 @@
     </include>
   </source>
 
+  <!-- ============================= -->
+  <!-- Environment Variables        -->
+  <!-- ============================= -->
   <php>
+    <!-- Set the application environment to 'testing' during PHPUnit runs -->
     <env name="APP_ENV" value="testing"/>
   </php>
+
 </phpunit>
+
