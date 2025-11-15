@@ -176,15 +176,15 @@ final class Router
             throw new \Ivi\Http\Exceptions\MethodNotAllowedHttpException($allowed);
         }
 
-        // 🔎 Optional debug context before 404 (safe to remove in production)
-        \Ivi\Core\Debug\Logger::dump('Router debug', [
-            'method'   => $method,
-            'path'     => $path,
-            'routes'   => array_map(
-                fn($kv) => [$kv[0], array_map(fn($r) => $r->getPath(), $kv[1])],
-                array_map(null, array_keys($this->routes), array_values($this->routes))
-            ),
-        ], ['exit' => false, 'show_trace' => false]);
+        // // 🔎 Optional debug context before 404 (safe to remove in production)
+        // \Ivi\Core\Debug\Logger::dump('Router debug', [
+        //     'method'   => $method,
+        //     'path'     => $path,
+        //     'routes'   => array_map(
+        //         fn($kv) => [$kv[0], array_map(fn($r) => $r->getPath(), $kv[1])],
+        //         array_map(null, array_keys($this->routes), array_values($this->routes))
+        //     ),
+        // ], ['exit' => false, 'show_trace' => false]);
 
         throw new \Ivi\Http\Exceptions\NotFoundHttpException('Route not found.');
     }
