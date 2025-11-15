@@ -424,32 +424,44 @@ if (!function_exists('config_path')) {
     }
 }
 
+
 if (!function_exists('module_asset')) {
     /**
      * Generate a public URL for a file inside a module's assets or public directory.
+     * By default, returns the full HTML tag for CSS/JS.
      *
      * Examples:
-     *   module_asset('Market/Core', 'softadastra-market.png');
-     *   → /modules/Market/Core/public/softadastra-market.png
+     *   module_asset('User/Core', 'assets/css/login.css');
+     *   → <link rel="stylesheet" href="/modules/User/Core/assets/css/login.css">
      *
-     *   module_asset('Market/Core', 'assets/css/style.css');
-     *   → /modules/Market/Core/assets/css/style.css
+     *   module_asset('User/Core', 'assets/js/login.js');
+     *   → <script src="/modules/User/Core/assets/js/login.js"></script>
      *
-     * @param  string  $module  Module name in the format "Vendor/Module"
-     * @param  string  $path    Path inside the module (assets/, public/, etc.)
-     * @return string           A web-accessible URL
+     * @param string $module
+     * @param string $path
+     * @param bool $tag If true, return HTML tag; else just URL
+     * @return string
      */
-    if (!function_exists('module_asset')) {
-        function module_asset(string $module, string $path): string
-        {
-            $modulePath = trim(str_replace('\\', '/', $module), '/');
-            $path = ltrim($path, '/'); // ex: 'softadastra-market.png' ou 'assets/css/style.css'
+    function module_asset(string $module, string $path, bool $tag = true): string
+    {
+        $modulePath = trim(str_replace('\\', '/', $module), '/');
+        $path = ltrim($path, '/');
 
-            // NE PAS préfixer par "public/" ici !
-            return function_exists('asset')
-                ? asset("modules/{$modulePath}/{$path}")
-                : "/modules/{$modulePath}/{$path}";
+        $url = function_exists('asset')
+            ? asset("modules/{$modulePath}/{$path}")
+            : "/modules/{$modulePath}/{$path}";
+
+        if (!$tag) {
+            return $url;
         }
+
+        // Détecte le type de fichier par extension
+        $ext = pathinfo($path, PATHINFO_EXTENSION);
+        return match (strtolower($ext)) {
+            'css' => '<link rel="stylesheet" href="' . $url . '">',
+            'js'  => '<script src="' . $url . '" defer></script>',
+            default => $url,
+        };
     }
 }
 

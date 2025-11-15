@@ -274,8 +274,39 @@ PHP;
         /* ------------------- Public assets ------------------- */
         $cssFile = "{$moduleDir}/Core/Public/assets/css/style.css";
         $jsFile  = "{$moduleDir}/Core/Public/assets/js/script.js";
-        file_put_contents($cssFile, "/* CSS for {$name} module */\nbody { font-family: sans-serif; }\n");
-        file_put_contents($jsFile, "// JS for {$name} module\nconsole.log('{$name} module loaded');\n");
+
+        // CSS simple pour visualiser le module
+        $cssContent = <<<CSS
+/* CSS for {$name} module */
+body {
+    font-family: sans-serif;
+    background-color: #f0f4f8;
+    color: #333;
+}
+h1 {
+    color: #008037;
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+p {
+    font-size: 1rem;
+}
+CSS;
+        file_put_contents($cssFile, $cssContent);
+
+        // JS simple pour visualiser le module
+        $jsContent = <<<JS
+// JS for {$name} module
+console.log('{$name} module loaded');
+document.addEventListener('DOMContentLoaded', function () {
+    const el = document.querySelector('h1');
+    if (el) {
+        el.style.borderBottom = '2px solid #008037';
+        el.style.paddingBottom = '0.5rem';
+    }
+});
+JS;
+        file_put_contents($jsFile, $jsContent);
 
         /* ------------------- views ------------------- */
         $viewFile = "{$moduleDir}/Core/views/home.php";
@@ -287,6 +318,7 @@ PHP;
 <?= \$scripts ?? '' ?>
 PHP;
         file_put_contents($viewFile, $viewContent);
+
 
         /* ------------------- Routes ------------------- */
         $routesFile = "{$moduleDir}/Core/routes/web.php";
@@ -318,12 +350,16 @@ class HomeController extends Controller
 {
     public function index(): HtmlResponse
     {
+        // Titre de la page
         \$title = (string) (cfg(strtolower('{$name}') . '.title', 'Softadastra {$name}') ?: 'Softadastra {$name}');
         \$this->setPageTitle(\$title);
 
+        // Message pour la vue
         \$message = "Hello from {$name}Controller!";
-        \$styles  = '<link rel="stylesheet" href="' . asset("assets/css/style.css") . '">';
-        \$scripts = '<script src="' . asset("assets/js/script.js") . '" defer></script>';
+
+        // 🔹 Correct: module_asset avec Core et tag HTML généré automatiquement
+        \$styles  = module_asset('{$name}/Core', 'assets/css/style.css');
+        \$scripts = module_asset('{$name}/Core', 'assets/js/script.js');
 
         return \$this->view(strtolower('{$name}') . '::home', [
             'title'   => \$title,
@@ -334,6 +370,7 @@ class HomeController extends Controller
     }
 }
 PHP;
+
         file_put_contents($controllerFile, $controllerContent);
 
         /* ------------------- Sample migration & seeder ------------------- */
