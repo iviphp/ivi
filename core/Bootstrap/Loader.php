@@ -58,9 +58,16 @@ final class Loader
         defined('BASE_PATH') || define('BASE_PATH', $baseDir);
         defined('VIEWS')     || define('VIEWS', $baseDir . '/views/');
         defined('APP_ENV')   || define('APP_ENV', $_ENV['APP_ENV'] ?? 'prod');
+
         defined('JWT_SECRET') || define('JWT_SECRET', $_ENV['JWT_SECRET']);
-        defined('GOOGLE_CLIENT_ID') || define('GOOGLE_CLIENT_ID', $_ENV['GOOGLE_CLIENT_ID']);
-        defined('GOOGLE_CLIENT_SECRET') || define('GOOGLE_CLIENT_SECRET', $_ENV['GOOGLE_CLIENT_SECRET']);
+        defined('CLOUDINARY_FOLDER') || define('CLOUDINARY_FOLDER', $_ENV['CLOUDINARY_FOLDER'] ?? 'softadastra/good');
+
+        defined('GOOGLE_CLIENT_ID') || define('GOOGLE_CLIENT_ID', $_ENV['GOOGLE_CLIENT_ID'] ?? null);
+        defined('GOOGLE_CLIENT_SECRET') || define('GOOGLE_CLIENT_SECRET', $_ENV['GOOGLE_CLIENT_SECRET'] ?? null);
+        defined('GOOGLE_REDIRECT_URI') || define('GOOGLE_REDIRECT_URI', $_ENV['GOOGLE_REDIRECT_URI'] ?? null);
+
+        // NEW → Scopes dynamiques depuis .env
+        defined('GOOGLE_SCOPES') || define('GOOGLE_SCOPES', $_ENV['GOOGLE_SCOPES'] ?? 'email,profile');
     }
 
     /**
