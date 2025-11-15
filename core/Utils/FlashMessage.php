@@ -6,17 +6,26 @@ class FlashMessage
 {
     private const VALID_TYPES = ['success', 'error', 'warning', 'info'];
 
-    /**
-     * Add a flash message.
-     */
+    /** @var callable|null Handler optionnel pour tests */
+    private static $handler;
+
+    public static function setHandler(?callable $handler): void
+    {
+        self::$handler = $handler;
+    }
+
     public static function add(string $type, string $message): void
     {
-        if (!in_array($type, self::VALID_TYPES)) {
-            $type = 'info'; // fallback sécurisé
+        if (!in_array($type, self::VALID_TYPES, true)) {
+            $type = 'info';
         }
 
-        // Protection XSS
         $message = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
+
+        if (self::$handler) {
+            call_user_func(self::$handler, $type, $message);
+            return;
+        }
 
         if (!isset($_SESSION['flash_messages'])) {
             $_SESSION['flash_messages'] = [];
@@ -25,59 +34,47 @@ class FlashMessage
         $_SESSION['flash_messages'][$type][] = $message;
     }
 
-    /**
-     * Check if any flash messages exist.
-     */
     public static function has(): bool
     {
+        if (self::$handler) {
+            return false;
+        }
         return !empty($_SESSION['flash_messages']);
     }
 
-    /**
-     * Get all flash messages (and clear them).
-     */
     public static function get(): array
     {
-        if (empty($_SESSION['flash_messages'])) {
+        if (self::$handler) {
             return [];
         }
 
         $messages = [];
-
-        foreach ($_SESSION['flash_messages'] as $type => $list) {
+        foreach ($_SESSION['flash_messages'] ?? [] as $type => $list) {
             foreach ($list as $msg) {
-                $messages[] = [
-                    'type' => $type,
-                    'message' => $msg
-                ];
+                $messages[] = ['type' => $type, 'message' => $msg];
             }
         }
 
         unset($_SESSION['flash_messages']);
-
         return $messages;
     }
 
-    /**
-     * Get messages only for a specific type
-     */
     public static function getByType(string $type): array
     {
-        if (empty($_SESSION['flash_messages'][$type])) {
+        if (self::$handler) {
             return [];
         }
 
-        $msgs = $_SESSION['flash_messages'][$type];
+        $msgs = $_SESSION['flash_messages'][$type] ?? [];
         unset($_SESSION['flash_messages'][$type]);
 
         return array_map(fn($m) => ['type' => $type, 'message' => $m], $msgs);
     }
 
-    /**
-     * Clear all flash messages without returning them.
-     */
     public static function clear(): void
     {
-        unset($_SESSION['flash_messages']);
+        if (!self::$handler) {
+            unset($_SESSION['flash_messages']);
+        }
     }
 }
