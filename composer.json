@@ -1,6 +1,6 @@
 {
   "name": "iviphp/ivi",
-  "description": "ivi.php — Simple. Modern. Expressive.",
+  "description": "Ivi.php is a fast, lightweight, and modular PHP framework with expressive routing, built-in ORM, caching, and WebSocket support—ideal for modern APIs and SPAs.",
   "type": "project",
   "license": "MIT",
   "authors": [
