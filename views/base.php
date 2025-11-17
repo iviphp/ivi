@@ -10,29 +10,54 @@
 
     <!-- Favicon -->
     <link rel="icon" href="<?= $favicon ?? asset('assets/favicon/favicon.png') ?>">
-    <link rel="stylesheet" href="<?= $css ?? asset('assets/css/app.css') ?>">
-    <meta name="theme-color" content="#008037">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-..." crossorigin="anonymous">
 
     <!-- Global CSS -->
     <link rel="stylesheet" href="<?= asset('assets/css/app.css') ?>">
-    <!-- Page-level CSS (optional) -->
+
+    <!-- Page-level CSS -->
     <?= $styles ?? '' ?>
+
+    <meta name="theme-color" content="#008037">
+
+    <!-- Optional: custom dark mode support -->
+    <script>
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+    </script>
 </head>
 
-<body>
+<body class="bg-light text-dark font-sans">
 
+    <!-- Header -->
     <?php include base_path('views/partials/header.php'); ?>
 
-    <main id="app">
+    <!-- SPA container -->
+    <main id="app" class="min-vh-100 p-4 container">
         <?= $content ?? '' ?>
     </main>
 
+    <!-- Footer -->
     <?php include base_path('views/partials/footer.php'); ?>
 
+    <!-- Bootstrap JS Bundle (with Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-..." crossorigin="anonymous" defer></script>
+
     <!-- Global JS -->
+    <script src="<?= asset('assets/js/spa.js') ?>" defer></script>
     <script src="<?= asset('assets/js/app.js') ?>" defer></script>
-    <!-- Page-level JS (optional) -->
+
+    <!-- SPA toggle -->
+    <script>
+        window.__SPA__ = <?= isset($noSpa) && $noSpa ? 'false' : 'true' ?>;
+    </script>
+
+    <!-- Page-level JS -->
     <?= $scripts ?? '' ?>
+
 </body>
 
 </html>

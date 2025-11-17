@@ -424,7 +424,6 @@ if (!function_exists('config_path')) {
     }
 }
 
-
 if (!function_exists('module_asset')) {
     /**
      * Generate a public URL for a file inside a module's assets or public directory.
@@ -465,6 +464,7 @@ if (!function_exists('module_asset')) {
     }
 }
 
+
 if (!function_exists('module_view_path')) {
     /**
      * Resolve the absolute path to a module's view file.
@@ -481,5 +481,115 @@ if (!function_exists('module_view_path')) {
     {
         $base = base_path("modules/" . trim(str_replace('\\', '/', $module), '/'));
         return "{$base}/views/" . ltrim($view, '/');
+    }
+}
+
+if (!function_exists('current_path')) {
+    /**
+     * Returns the current request path.
+     *
+     * Useful for comparing links to determine if they are active.
+     *
+     * @return string Current path (e.g., "/docs")
+     */
+    function current_path(): string
+    {
+        return (string) (parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/');
+    }
+}
+
+if (!function_exists('active_class')) {
+    /**
+     * Returns the "active" CSS class if the given link matches the current path.
+     *
+     * @param string $href The URL path to check
+     * @param string $class The CSS class to return when active (default: 'active')
+     * @return string 'active' if the link matches the current path, otherwise empty
+     */
+    function active_class(string $href, string $class = 'active'): string
+    {
+        $path = current_path();
+        if ($href === '/') {
+            return $path === '/' ? $class : '';
+        }
+        return str_starts_with($path, rtrim($href, '/')) ? $class : '';
+    }
+}
+
+if (!function_exists('spa_link')) {
+    /**
+     * Generates a SPA-ready anchor link (<a>).
+     *
+     * Internal links automatically get `data-spa` attribute for AJAX navigation.
+     * External links (absolute URLs, different domain) are left unchanged.
+     *
+     * @param string $href The link URL
+     * @param string $label The visible text of the link
+     * @param array $attrs Additional HTML attributes (e.g., 'class', 'id')
+     * @return string HTML anchor tag
+     */
+    function spa_link(string $href, string $label, array $attrs = []): string
+    {
+        // Detect external link
+        $parsed = parse_url($href);
+        $isExternal = isset($parsed['host'])
+            || str_starts_with($href, 'http')
+            || str_starts_with($href, '//');
+
+        // Internal link: add SPA attribute
+        if (!$isExternal) {
+            $attrs['data-spa'] = 'true';
+
+            // Ensure class attribute exists
+            if (!isset($attrs['class'])) {
+                $attrs['class'] = 'nav-link';
+            } else {
+                $attrs['class'] .= ' nav-link';
+            }
+        }
+
+        // Build attributes
+        $attrString = '';
+        foreach ($attrs as $k => $v) {
+            $attrString .= sprintf(' %s="%s"', htmlspecialchars($k), htmlspecialchars((string)$v));
+        }
+
+        return sprintf(
+            '<a href="%s"%s>%s</a>',
+            htmlspecialchars($href),
+            $attrString,
+            htmlspecialchars($label)
+        );
+    }
+}
+
+if (!function_exists('menu')) {
+    /**
+     * Generates a full HTML menu (SPA-ready).
+     *
+     * Example:
+     * echo menu([
+     *     '/' => 'Home',
+     *     '/docs' => 'Docs',
+     *     '/guide' => 'Guide',
+     * ], ['class' => 'nav-links']);
+     *
+     * @param array $items ['href' => 'Label', ...] The menu items
+     * @param array $attrs Attributes for the container <nav> or <ul>
+     * @param bool $useList If true, outputs <ul><li>...</li></ul>; otherwise <nav>...</nav>
+     * @return string HTML of the menu
+     */
+    function menu(array $items, array $attrs = [], bool $useList = false): string
+    {
+        $attrString = '';
+        foreach ($attrs as $k => $v) $attrString .= sprintf(' %s="%s"', htmlspecialchars($k), htmlspecialchars((string)$v));
+
+        $html = $useList ? "<ul{$attrString}>" : "<nav{$attrString}>";
+        foreach ($items as $href => $label) {
+            $linkAttrs = ['data-spa' => true];
+            $html .= $useList ? "<li>" . spa_link($href, $label, $linkAttrs) . "</li>" : spa_link($href, $label, $linkAttrs);
+        }
+        $html .= $useList ? '</ul>' : '</nav>';
+        return $html;
     }
 }

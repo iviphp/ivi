@@ -112,7 +112,6 @@ abstract class Controller
         ?string $layoutOverride = null,
         int $status = 200
     ): HtmlResponse {
-        // au lieu de $filePath = $viewsDir . $this->dotToPath($path) . '.php';
         [$baseForView, $fileRel] = $this->resolveViewPath($path);
         $filePath = $baseForView . $fileRel;
 
@@ -120,40 +119,50 @@ abstract class Controller
             throw new ViewNotFoundException($filePath);
         }
 
+        // Capture du contenu fragment HTML
         $content = $this->capture(function () use ($filePath, $params) {
-            if (is_array($params)) {
-                extract($params, EXTR_SKIP);
-            }
+            if (is_array($params)) extract($params, EXTR_SKIP);
             require $filePath;
         });
 
-        if ($this->isAjax($request)) {
+        $isAjax = $this->isAjax($request);
+        $isSPA  = ($params['spa'] ?? false);
+
+        /**
+         * 🚀 CAS 1 : SPA + AJAX = on renvoie le fragment sans layout
+         */
+        if ($isSPA && $isAjax) {
             return new HtmlResponse($content, $status);
         }
 
+        /**
+         * 🚀 CAS 2 : Page normale = on enveloppe avec le layout complet
+         */
         $layout = $layoutOverride ?? $this->layout;
         $layoutPath = $this->viewsBasePath() . $layout;
+
         if (!is_file($layoutPath)) {
             return new HtmlResponse($content, $status);
         }
 
+        // Capture du layout complet
         $full = $this->capture(function () use ($layoutPath, $content, $params) {
-            if (!empty(self::$layoutVars)) {
-                extract(self::$layoutVars, EXTR_OVERWRITE);
-            }
+            if (!empty(self::$layoutVars)) extract(self::$layoutVars, EXTR_OVERWRITE);
+            if (is_array($params)) extract($params, EXTR_OVERWRITE);
 
-            if (is_array($params)) {
-                extract($params, EXTR_OVERWRITE);
-            }
-
-            if (!isset($title) || $title === null || $title === '') {
+            if (!isset($title) || !$title) {
                 $title = 'ivi.php';
             }
 
+            // Flag SPA pour le JS global (spa.js)
+            echo '<script>window.__SPA__ = true;</script>';
+
             require $layoutPath;
         });
+
         return new HtmlResponse($full, $status);
     }
+
 
     /**
      * Shortcut for rendering a view using the default layout.
@@ -174,6 +183,13 @@ abstract class Controller
         ?Request $request = null,
         int $status = 200
     ): HtmlResponse {
+
+        // Active automatiquement le mode SPA pour les requêtes AJAX
+        if ($request && $this->isAjax($request)) {
+            $params = $params ?? [];
+            $params['spa'] = true;
+        }
+
         return $this->render($path, $params, $request, null, $status);
     }
 
@@ -284,7 +300,6 @@ abstract class Controller
         }
         return $out ?: '';
     }
-
 
     /** Enregistre un namespace de vues, ex: Controller::addViewNamespace('market', '/abs/path/to/views') */
     public static function addViewNamespace(string $ns, string $path): void
