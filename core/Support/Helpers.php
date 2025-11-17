@@ -593,3 +593,47 @@ if (!function_exists('menu')) {
         return $html;
     }
 }
+
+if (!function_exists('config_value')) {
+    /**
+     * Global config accessor.
+     *
+     * Usage:
+     *   config_value('google');            // entire google.php array
+     *   config_value('google.client_id');  // specific key
+     *   config_value('google.foo', 'bar'); // default if key not set
+     *
+     * @param string|null $key Dot-notated key or null to get all
+     * @param mixed $default Default value if key not found
+     * @return mixed
+     */
+    function config_value(?string $key = null, mixed $default = null): mixed
+    {
+        // Try DI container first
+        if (function_exists('container')) {
+            try {
+                $c = container();
+                if ($c && $c->has('config')) {
+                    $cfg = $c->get('config');
+
+                    if ($key === null && method_exists($cfg, 'all')) {
+                        return $cfg->all();
+                    }
+
+                    if ($key !== null && method_exists($cfg, 'get')) {
+                        return $cfg->get($key, $default);
+                    }
+                }
+            } catch (\Throwable $e) {
+                // fallback to static Config
+            }
+        }
+
+        // Static fallback
+        if ($key === null) {
+            return \Ivi\Core\Config\Config::all();
+        }
+
+        return \Ivi\Core\Config\Config::get($key, $default);
+    }
+}

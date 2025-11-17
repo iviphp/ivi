@@ -3,7 +3,10 @@
 namespace Modules\Market\Core\Http\Controllers;
 
 use App\Controllers\Controller;
+use Google\Service\AIPlatformNotebooks\DefaultValues;
+use Ivi\Core\Cache\Cache;
 use Ivi\Http\HtmlResponse;
+use Ivi\Core\Services\GoogleService;
 
 /**
  * -----------------------------------------------------------------------------
@@ -33,6 +36,22 @@ use Ivi\Http\HtmlResponse;
  */
 final class HomeController extends Controller
 {
+    private GoogleService $google;
+
+    public function __construct()
+    {
+        // Récupère la configuration Google via le helper global
+        $config = config_value('google');
+
+        if (!$config || !is_array($config)) {
+            throw new \RuntimeException(
+                "Google configuration not found. " .
+                    "Ensure config/google.php exists and returns an array."
+            );
+        }
+
+        $this->google = new GoogleService($config);
+    }
     /**
      * Display the Market home page.
      *
@@ -44,17 +63,54 @@ final class HomeController extends Controller
      */
     public function index(): HtmlResponse
     {
-        $title = (string) (cfg('market.title', 'Softadastra Market') ?: 'Softadastra Market');
-        $this->setPageTitle($title);
+        $cache = Cache::getInstance();
+
+        $cacheKey = 'home_message';
+
+        $message = $cache->remember($cacheKey, 3600, function () {
+            return "Hello ! (generated at " . date('H:i:s') . " | fresh)";
+        });
+
+        $title = $this->setPageTitle('market.title');
 
         // favicon spécifique au module
         $favicon = module_asset('Market/Core', 'softadastra-market.png');
         $css     = module_asset('Market/Core', 'assets/css/style.css');
 
         return $this->view('market::home', [
-            'title'   => 'Softadastra Market',
+            'title'   => $title,
             'favicon' => $favicon,
-            'css'     => $css,
+            'styles'     => $css,
+            'message' => $message
+        ]);
+    }
+
+    public function viewCache()
+    {
+        $cache = Cache::getInstance();
+
+        $keys = [
+            'key_message' => "Hi! (generated at " . date('H:i:s') . " | home)",
+            'welcome_message' => "Welcome! (generated at " . date('H:i:s') . " | welcome)",
+            'footer_message' => "Footer info (generated at " . date('H:i:s') . " | footer"
+        ];
+
+        $messages = [];
+        foreach ($keys as $key => $defaultValue) {
+            $messages[$key] = $cache->remember($key, 3600, function () use ($defaultValue) {
+                return $defaultValue;
+            });
+
+            if ($cache->get($key) !== null) {
+                $messages[$key] .= " [from cache]";
+            }
+        }
+
+        $allKeys = $cache->listKeys();
+
+        dd([
+            'keys_in_cache' => $allKeys,
+            'messages' => $messages
         ]);
     }
 }

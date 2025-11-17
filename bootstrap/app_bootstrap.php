@@ -11,66 +11,37 @@ declare(strict_types=1);
  * It ensures that the application starts consistently, regardless of whether
  * it is executed as a standalone project or installed as a Composer dependency.
  *
- * ## Responsibilities
- * - Initialize early error handling (critical for boot diagnostics)
- * - Locate and include the Composer autoloader (portable resolution)
- * - Optionally register module autoloaders
- * - Initialize error and session subsystems
- * - Instantiate and run the core application
+ * Responsibilities:
+ * - Initialize early error handling
+ * - Load Composer autoloader
+ * - Load modules
+ * - Bootstrap environment constants and configuration
+ * - Initialize session & error subsystems
+ * - Instantiate and run the app
  *
- * ## Autoload Resolution Strategy
- * 1. Local vendor directory → `<project_root>/vendor/autoload.php`
- * 2. Dependency context → `<parent_project>/vendor/autoload.php`
- * 3. User-defined vendor directory via `COMPOSER_VENDOR_DIR`
- * 4. Global Composer installation paths:
- *    - `~/.config/composer/vendor/autoload.php`
- *    - `~/.composer/vendor/autoload.php`
- *
- * ## Design Notes
- * - Fully portable: safe to include from both local and dependency contexts
- * - Clear diagnostics when no valid autoload file is found
- * - Isolated from global state until after autoload and session bootstrap
- *
- * @package   Ivi\Core
- * @category  Bootstrap
- * @version   1.0
+ * @package Ivi\Core
+ * @version 1.2
  * ============================================================================
  */
 
 //
-// 1) Early error system (must be first)
+// 1) Early error system
 //
 require_once dirname(__DIR__) . '/bootstrap/early_errors.php';
 
 //
-// 2) Robust Composer autoloader resolution
+// 2) Composer autoloader
 //
 (function (): void {
     $candidates = [
-        // Local project installation
         dirname(__DIR__) . '/vendor/autoload.php',
-
-        // Composer dependency installation (e.g., vendor/iviphp/ivi/bootstrap)
         dirname(__DIR__, 4) . '/autoload.php',
-
-        // User-defined vendor directory (if set)
-        (function () {
-            $vd = getenv('COMPOSER_VENDOR_DIR');
-            return $vd ? rtrim($vd, '/\\') . '/autoload.php' : null;
-        })(),
-
-        // Global Composer installations
-        (function () {
-            $home = getenv('HOME');
-            return $home ? $home . '/.config/composer/vendor/autoload.php' : null;
-        })(),
-        (function () {
-            $home = getenv('HOME');
-            return $home ? $home . '/.composer/vendor/autoload.php' : null;
-        })(),
+        (fn() => getenv('COMPOSER_VENDOR_DIR') ? rtrim(getenv('COMPOSER_VENDOR_DIR'), '/\\') . '/autoload.php' : null)(),
+        (fn() => getenv('HOME') ? getenv('HOME') . '/.config/composer/vendor/autoload.php' : null)(),
+        (fn() => getenv('HOME') ? getenv('HOME') . '/.composer/vendor/autoload.php' : null)(),
     ];
 
-    $candidates = array_values(array_filter(array_unique($candidates ?? [])));
+    $candidates = array_values(array_filter(array_unique($candidates)));
 
     foreach ($candidates as $path) {
         if (is_string($path) && is_file($path)) {
@@ -79,15 +50,40 @@ require_once dirname(__DIR__) . '/bootstrap/early_errors.php';
         }
     }
 
-    $tried = implode("\n - ", $candidates);
     throw new RuntimeException(
-        "Composer autoload not found. Tried paths:\n - " . $tried .
-            "\nHint: run `composer install` at the project root, or ensure ivi.php is installed correctly."
+        "Composer autoload not found. Tried paths:\n - " . implode("\n - ", $candidates) .
+            "\nHint: run `composer install`."
     );
 })();
 
 //
-// 3) Module autoloading (optional)
+// 2b) Bootstrap environment constants
+//
+\Ivi\Core\Bootstrap\Loader::bootstrap(dirname(__DIR__));
+
+//
+// 2c) Vérifie que les constantes Google sont définies
+//
+if (!defined('GOOGLE_CLIENT_ID')) {
+    define('GOOGLE_CLIENT_ID', getenv('GOOGLE_CLIENT_ID') ?: '');
+}
+if (!defined('GOOGLE_CLIENT_SECRET')) {
+    define('GOOGLE_CLIENT_SECRET', getenv('GOOGLE_CLIENT_SECRET') ?: '');
+}
+if (!defined('GOOGLE_REDIRECT_URI')) {
+    define('GOOGLE_REDIRECT_URI', getenv('GOOGLE_REDIRECT_URI') ?: 'http://localhost/auth/google/callback');
+}
+if (!defined('GOOGLE_SCOPES')) {
+    define('GOOGLE_SCOPES', getenv('GOOGLE_SCOPES') ?: 'email,profile');
+}
+
+//
+// 2d) Initialise Config
+//
+\Ivi\Core\Config\Config::init(dirname(__DIR__) . '/config');
+
+//
+// 3) Modules autoload
 //
 $modulesAutoload = dirname(__DIR__) . '/support/modules_autoload.php';
 if (is_file($modulesAutoload)) {
@@ -95,15 +91,27 @@ if (is_file($modulesAutoload)) {
 }
 
 //
-// 4) Local subsystems: error and session initialization
+// 4) Session & error subsystems
 //
 require_once __DIR__ . '/errors.php';
 require_once __DIR__ . '/session.php';
 
 use Ivi\Core\Bootstrap\App;
+use Ivi\Core\Router\Router;
 
 //
-// 5) Application startup
+// 5) Initialise le router avant les routes
+//
+$router = new Router();
+
+// Inclut routes.php dans le scope où $router existe
+$routesFile = dirname(__DIR__) . '/config/routes.php';
+if (is_file($routesFile)) {
+    require $routesFile;
+}
+
+//
+// 6) Démarre l'application
 //
 $app = new App(
     baseDir: dirname(__DIR__),
