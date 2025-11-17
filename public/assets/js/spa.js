@@ -36,8 +36,19 @@ const SPA = (function () {
   const loadedScripts = new Set();
   const inlineScriptHashes = new Set();
 
+  // ---- Ajout pour styles ----
+  const loadedStyles = new Set(); // href absolu des link.css déjà ajoutés
+  const inlineStyleHashes = new Set(); // hash des <style> déjà injectés
+
   let appContainer = null;
   let errorOverlay = null;
+
+  /**
+   * Maximum wait time (in milliseconds) for external stylesheets to load.
+   * If a stylesheet takes longer than this, it is marked as failed but the SPA
+   * continues smoothly without blocking navigation.
+   */
+  const STYLE_LOAD_TIMEOUT_MS = 1200;
 
   const log = (...a) => cfg.debug && console.debug("[SPA]", ...a);
   const now = () => Date.now();
@@ -283,6 +294,127 @@ const SPA = (function () {
     });
   };
 
+  // timeout max pour charger les CSS (ms)
+
+  /**
+   * Loads all CSS from a fetched page into the current SPA view — smoothly, safely,
+   * and without freezing the UI.
+   *
+   * This function is the "styling teleporter" of the SPA engine:
+   *  - Scans the incoming Document for <link rel="stylesheet"> and <style> tags.
+   *  - Injects missing CSS into <head> without duplicating anything already loaded.
+   *  - Tracks external stylesheet loading using Promises, with a safety timeout to
+   *    avoid getting stuck on slow or broken links.
+   *  - Clones inline <style> blocks instantly (using content hashing to skip repeats).
+   *
+   * Because of this, page transitions feel native: no flashes, no layout jumps,
+   * and no full reload. Just seamless style syncing.
+   *
+   * @param {Document} doc - The HTML document whose styles should be imported.
+   * @returns {Promise<Array>} Resolves when all external stylesheets finish loading
+   *                           (or time out), giving detailed results for debugging.
+   */
+
+  const runPageStylesAsync = (doc) => {
+    if (!doc) return Promise.resolve();
+
+    const linkNodes = [...doc.querySelectorAll('link[rel="stylesheet"]')];
+    const styleNodes = [...doc.querySelectorAll("style")];
+
+    const loadPromises = [];
+
+    // 1) process <link rel="stylesheet">
+    for (const l of linkNodes) {
+      try {
+        const hrefAttr = l.getAttribute("href") || l.href;
+        if (!hrefAttr) continue;
+        const abs = new URL(hrefAttr, location.href).href.split("#")[0];
+
+        // skip if already loaded
+        if (loadedStyles.has(abs)) continue;
+
+        // create a <link> element with load/error handling
+        const nl = document.createElement("link");
+        nl.rel = "stylesheet";
+        nl.href = abs;
+        nl.dataset.spa = "true";
+
+        const p = new Promise((resolve) => {
+          let done = false;
+
+          const clean = () => {
+            nl.removeEventListener("load", onload);
+            nl.removeEventListener("error", onerror);
+            done = true;
+          };
+
+          const onload = () => {
+            clean();
+            loadedStyles.add(abs);
+            resolve({ href: abs, ok: true });
+          };
+
+          const onerror = () => {
+            clean();
+            loadedStyles.add(abs);
+            resolve({ href: abs, ok: false });
+          };
+
+          nl.addEventListener("load", onload);
+          nl.addEventListener("error", onerror);
+
+          // fallback timeout (avoid hanging forever)
+          setTimeout(() => {
+            if (!done) {
+              clean();
+              loadedStyles.add(abs);
+              resolve({ href: abs, ok: false, timeout: true });
+            }
+          }, STYLE_LOAD_TIMEOUT_MS);
+        });
+
+        // append to <head> (starts the download)
+        document.head.appendChild(nl);
+        loadPromises.push(p);
+      } catch (err) {
+        console.debug("SPA style link skipped:", err);
+      }
+    }
+
+    // 2) process inline <style> tags (synchronously)
+    for (const s of styleNodes) {
+      try {
+        const txt = s.textContent || "";
+        const h = hashString(txt);
+
+        // avoid duplicate inline styles
+        if (!inlineStyleHashes.has(h)) {
+          const ns = document.createElement("style");
+          ns.textContent = txt;
+          ns.dataset.spa = "true";
+          document.head.appendChild(ns);
+          inlineStyleHashes.add(h);
+          // no need to wait, inline styles apply instantly
+        }
+      } catch (err) {
+        console.debug("SPA inline style skipped:", err);
+      }
+    }
+
+    // if nothing to wait for → resolve immediately
+    if (loadPromises.length === 0) return Promise.resolve();
+
+    // wait for all stylesheet promises (each has its own timeout)
+    return Promise.all(loadPromises).then((results) => {
+      // debug failed or timed-out styles
+      const failed = results.filter((r) => !r.ok);
+      if (failed.length && cfg.debug) {
+        console.debug("[SPA] Some styles failed to load or timed out:", failed);
+      }
+      return results;
+    });
+  };
+
   // ---------------------------------------------------------
   // PAGE LOAD CORE (Safe & SPA-friendly)
   // ---------------------------------------------------------
@@ -290,51 +422,68 @@ const SPA = (function () {
     if (!appContainer) return (location.href = url);
 
     try {
-      // Récupération HTML (cache ou fetch)
+      // Retrieve HTML (from cache or network)
       const html = cacheGet(url) ?? (await fetchFragment(url));
 
-      // Parser le HTML
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
 
-      // Cherche le fragment SPA (#app) ou fallback sur body
+      // Update the document title if present
+      if (doc.title) document.title = doc.title;
+
+      // Look for the SPA fragment (#app), fallback to <body>
       const newFragment = doc.querySelector(cfg.containerSelector) || doc.body;
 
-      // Remplace le contenu actuel
+      // --- Hide the container to avoid visual flashes ---
+      // Safeguard: preserve any existing inline style
+      const prevVisibility = appContainer.style.visibility;
+      const prevOpacity = appContainer.style.opacity;
+      appContainer.style.visibility = "hidden";
+      appContainer.style.opacity = "0";
+
+      // Inject / sync remote page styles and wait for them to load
+      await runPageStylesAsync(doc);
+
+      // Replace the current content AFTER styles have been applied
       appContainer.innerHTML = newFragment.innerHTML;
 
-      // Execute les scripts de la page
+      // Execute page scripts
       runPageScripts(appContainer);
 
-      // Réinitialise les handlers des liens SPA
+      // Reinitialize SPA link handlers
       initLinkHandlers();
 
-      // Transition (fade/slide/zoom)
-      applyTransitionIn(appContainer);
+      // Restore visibility and trigger entrance transition
+      // Small delay so the browser can paint the applied styles first
+      setTimeout(() => {
+        appContainer.style.visibility = prevVisibility || "";
+        appContainer.style.opacity = prevOpacity || "";
+        applyTransitionIn(appContainer);
+      }, 10);
 
-      // Met à jour l’historique
+      // Update browser history
       if (push) {
         history.pushState(null, "", url);
-        updateActiveLinks(url); // lien actif
+        updateActiveLinks(url); // highlight active link
       } else {
-        updateActiveLinks(); // popstate
+        updateActiveLinks(); // popstate event
       }
 
-      // Scroll en haut
+      // Scroll to top
       scrollTo(0, 0);
 
       return true;
     } catch (err) {
       console.error("SPA loadPage error:", err);
 
-      // Message d’erreur seulement si fetch échoue
+      // Display a proper error message only if the fetch failed
       if (err instanceof TypeError || err.message.includes("Failed to fetch")) {
         showError("Failed to fetch page. Redirecting...");
       } else {
         showError("Unexpected SPA error. Reloading...");
       }
 
-      // Fallback full reload
+      // Fallback full page reload
       setTimeout(() => (location.href = url), 1500);
       return false;
     }
