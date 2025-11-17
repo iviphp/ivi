@@ -125,7 +125,11 @@ final class QueryBuilder
      */
     public function orderBy(string $column, string $direction = 'ASC'): self
     {
-        $this->orders[] = $column . ' ' . strtoupper($direction);
+        if (preg_match('/\b(ASC|DESC)\b/i', $column)) {
+            $this->orders[] = $column;
+        } else {
+            $this->orders[] = $column . ' ' . strtoupper($direction);
+        }
         return $this;
     }
 

@@ -1,148 +1,76 @@
-/* ==== ivi.php global base + shared header/footer (cleaned) ==== */
+/* ==========================================================================
+   ivi.php — app.css (2025 improved)
+   - Clean variables, dark mode, responsive nav with hamburger
+   - Smooth transitions, top progress bar for SPA
+   - Modern cards, buttons, accessible focus styles
+   - SPA transition classes: .spa-transition-fade-in / slide-in / zoom-in
+   ========================================================================== */
 
-/* Light mode defaults */
+/* --------------------------
+   DESIGN TOKENS
+   -------------------------- */
 :root {
-  /* Brand & UI */
+  /* Brand */
   --accent: #008037;
+  --accent-600: #006f2b;
   --bg: #ffffff;
-  --fg: #111111;
-  --muted: #555555;
+  --fg: #0f1720;
+  --muted: #55606a;
   --panel: #ffffff;
-  --border: #e5e7eb;
+  --border: #e6e9ee;
 
-  /* Code block (neutral default; docs.css peut surcharger localement) */
+  /* Code */
   --code-bg: #0b1220; /* dark navy */
-  --code-fg: #e6edf3; /* light text */
+  --code-fg: #e6edf3;
   --code-border: #0a101b;
   --code-line: #0f172a;
   --code-accent: #7dd3fc;
 
-  /* Back-compat alias (old var name used elsewhere) */
-  --code: var(--code-bg);
+  /* Layout */
+  --max-width: 1100px;
+  --radius: 12px;
+  --shadow-sm: 0 6px 18px rgba(0, 0, 0, 0.08);
+  --glass: rgba(255, 255, 255, 0.04);
 }
 
-/* Dark mode overrides */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0f1115;
-    --fg: #e6edf3;
-    --muted: #9aa4ad;
-    --panel: #0f141a;
-    --border: #1f252c;
-
-    /* Code block (slightly different dark hue) */
-    --code-bg: #0f172a; /* deep slate */
-    --code-fg: #e2e8f0;
-    --code-border: #0b1220;
-    --code-line: #111827;
-    --code-accent: #7dd3fc;
-
-    --code: var(--code-bg); /* keep alias consistent */
-  }
-}
-
+/* --------------------------
+   GLOBAL RESET & BASE
+   -------------------------- */
 * {
   box-sizing: border-box;
 }
-html,
-body {
-  height: 100%;
-}
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Arial,
-    sans-serif;
-  line-height: 1.5;
-  display: flex;
-  flex-direction: column;
-}
-.container {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 14px 20px;
-}
 
-/* --- Shared NAV (green) --- */
-.nav {
-  position: sticky;
+/* --------------------------
+   TOP PROGRESS BAR (SPA use)
+   -------------------------- */
+#spa-progress {
+  position: fixed;
   top: 0;
-  z-index: 40;
-  background: var(--accent);
-  color: #fff;
-  border-bottom: 1px solid color-mix(in oklab, #000 14%, transparent);
-  transition: box-shadow 0.2s ease;
+  left: 0;
+  height: 3px;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--code-accent));
+  z-index: 999999;
+  transition: width 0.22s ease, opacity 0.22s ease;
+  will-change: width;
+  opacity: 0;
 }
-.nav.is-scrolled {
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
-}
-.nav-row {
-  display: grid;
-  align-items: center;
-  grid-template-columns: 1fr auto auto;
-  gap: 14px;
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 14px 20px;
-}
-.nav-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #fff;
-  text-decoration: none;
-  font-weight: 900;
-  letter-spacing: 0.3px;
-}
-.nav-brand img {
-  width: 26px;
-  height: 26px;
-  display: block;
-}
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  justify-self: center;
-}
-.nav-links a {
-  display: inline-block;
-  padding: 8px 12px;
-  color: #fff;
-  text-decoration: none;
-  border-radius: 8px;
-  font-weight: 600;
-  opacity: 0.95;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
-}
-.nav-links a:hover,
-.nav-links a.active {
-  background: rgba(255, 255, 255, 0.15);
+#spa-progress.active {
   opacity: 1;
 }
-.nav-pill {
-  justify-self: end;
-  background: #fff;
-  color: var(--accent);
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-weight: 800;
-  font-size: 12px;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
-}
-@media (max-width: 780px) {
-  .nav-row {
-    grid-template-columns: 1fr auto;
-  }
-  .nav-links {
-    display: none;
-  }
+
+/* --------------------------
+   MAIN / CONTENT
+   -------------------------- */
+main#app {
+  flex: 1;
+  padding: 28px 0;
+  width: 100%;
 }
 
-/* --- Shared sections/cards/buttons base --- */
+/* Sections / grid */
 .section {
-  padding: 32px 20px;
+  padding: 28px 20px;
 }
 .grid {
   display: grid;
@@ -157,66 +85,75 @@ body {
     grid-column: span 4;
   }
 }
+
+/* Card */
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   padding: 18px;
   transition: transform 0.15s ease, box-shadow 0.15s ease,
     border-color 0.15s ease;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
 }
 .card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 22px rgba(0, 128, 55, 0.15);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.08);
   border-color: transparent;
 }
+
+/* Buttons */
 .btn {
   display: inline-block;
-  border: 1px solid var(--accent);
+  padding: 12px 18px;
+  border-radius: 12px;
   background: var(--accent);
   color: #fff;
   text-decoration: none;
-  padding: 12px 18px;
-  border-radius: 12px;
   font-weight: 800;
-  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
 }
 .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 22px rgba(0, 128, 55, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1);
 }
 .btn.secondary {
   background: transparent;
   color: var(--accent);
-  border: 1px solid var(--accent);
-}
-.btn.secondary:hover {
-  background: rgba(0, 128, 55, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 .btn-lg {
   padding: 14px 20px;
   border-radius: 14px;
 }
 
-/* --- Shared code blocks (basic) --- */
+/* --------------------------
+   CODE BLOCKS & PRE
+   -------------------------- */
 pre {
-  background: var(--code);
-  border: 1px solid var(--border);
+  background: var(--code-bg);
+  color: var(--code-fg);
   border-radius: 10px;
   padding: 14px;
   overflow: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono",
+    monospace;
   font-size: 13.5px;
+  border: 1px solid var(--code-border);
   margin: 18px 0;
 }
 code {
-  background: rgba(0, 128, 55, 0.08);
+  background: rgba(0, 0, 0, 0.04);
   color: var(--accent);
+  padding: 2px 6px;
   border-radius: 6px;
-  padding: 2px 5px;
+  font-size: 0.95em;
 }
 
-/* --- Shared footer --- */
+/* --------------------------
+   FOOTER
+   -------------------------- */
 footer {
   margin-top: auto;
   border-top: 1px solid var(--border);
@@ -224,27 +161,40 @@ footer {
   color: var(--muted);
 }
 footer .foot {
-  max-width: 1100px;
+  max-width: var(--max-width);
   margin: 0 auto;
   padding: 14px 20px;
   font-size: 14px;
-  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
 }
 .foot .foot-links {
-  float: right;
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 @media (max-width: 640px) {
+  footer .foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
   .foot .foot-links {
-    float: none;
-    display: block;
-    margin-top: 8px;
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 }
 
-/* --- Accessibility/Motion --- */
+/* --------------------------
+   ACCESSIBILITY / MOTION
+   -------------------------- */
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: 3px solid rgba(0, 128, 55, 0.18);
+  outline-offset: 3px;
+  border-radius: 6px;
 }
 @media (prefers-reduced-motion: reduce) {
   * {
@@ -254,3 +204,278 @@ footer .foot {
     scroll-behavior: auto !important;
   }
 }
+
+/* --------------------------
+   UTILS
+   -------------------------- */
+.text-muted {
+  color: var(--muted);
+}
+.hstack {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.vstack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* --------------------------
+   SPA TRANSITIONS (classes used by spa.js)
+   -------------------------- */
+/* Fade */
+.spa-transition-fade-in {
+  animation: spa-fade-in 0.28s ease both;
+}
+@keyframes spa-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Slide */
+.spa-transition-slide-in {
+  animation: spa-slide-in 0.32s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+@keyframes spa-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(10px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* Zoom */
+.spa-transition-zoom-in {
+  animation: spa-zoom-in 0.28s cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+@keyframes spa-zoom-in {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* --------------------------
+   SMALL FIXES / FALLBACKS
+   -------------------------- */
+/* Ensure clickable anchors inside nav are visually consistent */
+.nav a,
+.nav button {
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Prevent layout shift when cards border becomes transparent */
+.card {
+  border: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+/* Helpers for hiding/showing */
+.hide {
+  display: none !important;
+}
+
+footer {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+footer .foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 14px 20px;
+}
+
+footer .foot-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+footer .foot-links .separator {
+  margin: 0 4px;
+  color: var(--muted);
+}
+
+footer a.link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.15s ease;
+}
+
+footer a.link:hover,
+footer a.link.active {
+  color: #005b25;
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  footer .foot {
+    flex-direction: column;
+    text-align: center;
+    gap: 6px;
+  }
+}
+/* ==========================================================================
+   CODE BLOCKS — Enhanced for Markdown & SPA
+   ========================================================================== */
+.code-block {
+  position: relative;
+  margin: 24px 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  box-shadow: var(--shadow-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.code-block:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+}
+
+/* Header: language badge + copy button */
+.code-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: color-mix(in oklab, var(--code-bg) 85%, #000 15%);
+  border-bottom: 1px solid var(--code-border);
+}
+.lang-badge {
+  text-transform: uppercase;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--code-accent);
+  letter-spacing: 0.5px;
+}
+
+/* Copy button */
+.copy-btn {
+  appearance: none;
+  border: none;
+  background: var(--code-accent);
+  color: var(--code-bg);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.copy-btn:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+.copy-btn.copied {
+  background: #10b981;
+  color: #fff;
+}
+.copy-btn.copied::after {
+  content: " ✓ Copied!";
+  margin-left: 4px;
+  font-weight: 600;
+}
+
+/* Pre / Code area */
+.code-block pre {
+  margin: 0;
+  padding: 14px;
+  overflow-x: auto;
+  font-size: 13.5px;
+  line-height: 1.6;
+  background: transparent;
+  color: var(--code-fg);
+}
+.code-block pre code {
+  display: block;
+  white-space: pre;
+}
+
+/* Zebra stripes if .line exists */
+.code-block pre code .line:nth-child(odd) {
+  background: var(--code-line);
+  display: block;
+  padding-left: 0.5rem;
+}
+
+/* Inline code inside markdown */
+.markdown-body code:not(pre code) {
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--accent);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 0.95em;
+}
+
+/* Text selection */
+.code-block ::selection {
+  background: color-mix(in oklab, var(--code-accent) 35%, transparent);
+}
+
+/* Light mode overrides */
+@media (prefers-color-scheme: light) {
+  .code-block {
+    background: #f5f7fa;
+    border: 1px solid #d1d5db;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+  }
+  .code-head {
+    background: rgba(0, 0, 0, 0.02);
+    color: #111827;
+  }
+  .lang-badge {
+    color: var(--accent);
+  }
+  .copy-btn {
+    background: var(--accent);
+    color: #fff;
+  }
+  .copy-btn.copied {
+    background: #10b981;
+  }
+  .code-block pre {
+    color: #1f2937;
+  }
+  .code-block pre code .line:nth-child(odd) {
+    background: rgba(0, 0, 0, 0.03);
+  }
+}
+
+main#app {
+  flex: 1 0 auto; /* prend tout l'espace restant */
+}
+
+footer {
+  flex-shrink: 0; /* évite que le footer soit écrasé */
+}
+
+/* --------------------------
+   END
+   -------------------------- */
