@@ -61,7 +61,6 @@ final class DocsController extends Controller
                     $lang = 'php';
                 }
 
-                // Inject or merge class="language-xxx" only (no "hljs")
                 if ($lang) {
                     if (preg_match('/\bclass="([^"]*)"/i', $attrs, $cm)) {
                         $class = trim($cm[1] . ' language-' . $lang);
@@ -95,13 +94,9 @@ HTML;
             'content' => $html,
             'styles'  => '<link rel="stylesheet" href="' . asset('assets/css/docs.css') . '">',
             'scripts' => '
-  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/build/highlight.min.js"></script>
-  <script>
-    // Optional: restrict detection to common languages
-    hljs.configure({languages: ["php","javascript","json","bash","html","css","ini","yaml"]});
-    hljs.highlightAll();
-  </script>
-',
+                <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/build/highlight.min.js" data-spa-persistent="1"></script>
+            ',
         ], $request);
     }
 }
+

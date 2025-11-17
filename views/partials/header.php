@@ -28,29 +28,3 @@
         </span>
     </div>
 </header>
-
-<style>
-    /* Nav base styling */
-    .nav {
-        position: sticky;
-        top: 0;
-        z-index: 1000;
-        background-color: var(--bg, #f8f9fa);
-    }
-
-    .nav-links a {
-        text-decoration: none;
-        color: var(--fg, #212529);
-        font-weight: 500;
-        transition: color 0.2s ease;
-    }
-
-    .nav-links a:hover {
-        color: var(--accent, #008037);
-    }
-
-    .nav-pill {
-        font-size: 0.8rem;
-        padding: 0.25em 0.5em;
-    }
-</style>
