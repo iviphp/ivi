@@ -48,7 +48,6 @@ const SPA = (function () {
    * If a stylesheet takes longer than this, it is marked as failed but the SPA
    * continues smoothly without blocking navigation.
    */
-  const STYLE_LOAD_TIMEOUT_MS = 1200;
 
   const log = (...a) => cfg.debug && console.debug("[SPA]", ...a);
   const now = () => Date.now();
@@ -116,39 +115,6 @@ const SPA = (function () {
     let h = 5381;
     for (let i = 0; i < s.length; i++) h = (h << 5) + h + s.charCodeAt(i);
     return (h >>> 0).toString(36);
-  };
-
-  const runPageScripts = (container) => {
-    if (!container) return;
-
-    const scripts = [...container.querySelectorAll("script")];
-
-    for (const old of scripts) {
-      try {
-        if (old.src) {
-          const src = old.src.split("#")[0];
-          if (!loadedScripts.has(src)) {
-            const s = document.createElement("script");
-            s.src = src;
-            s.defer = true;
-            document.body.appendChild(s);
-            loadedScripts.add(src);
-          }
-        } else {
-          const txt = old.textContent || "";
-          const h = hashString(txt);
-          if (!inlineScriptHashes.has(h)) {
-            const s = document.createElement("script");
-            s.textContent = txt;
-            document.body.appendChild(s);
-            inlineScriptHashes.add(h);
-          }
-        }
-      } catch (err) {
-        console.error("SPA script exec error:", err);
-      }
-      old.remove();
-    }
   };
 
   // ---------------------------------------------------------
@@ -315,45 +281,236 @@ const SPA = (function () {
    *                           (or time out), giving detailed results for debugging.
    */
 
+  const STYLE_LOAD_TIMEOUT_MS = 5000; // 5000ms = 5 secondes, tu peux ajuster
+
+  // ---------------------------
+  // Nouvelle option de nettoyage
+  // ---------------------------
+  Object.assign(cfg, {
+    // strategy: "keep-shared" | "remove-all" | "strict"
+    // - keep-shared : supprime seulement les styles marqués page-scoped absents dans la nouvelle page
+    //                 mais laisse toutes les feuilles "non marquées" (safe default).
+    // - remove-all   : supprime tout ce que SPA a injecté auparavant (data-spa) qui n'est pas présent maintenant.
+    // - strict       : comme remove-all mais retire aussi les styles non-marques si ils semblent être non-shared
+    spaPageCleanupStrategy: "keep-shared",
+    // liste whitelist persistante (href or hash) à conserver toujours (utile pour libs globales)
+    spaPersistentStyleWhitelist: new Set(),
+  });
+
+  // helper heuristique : est-ce que ce style est "partagé" globalement (heuristique)
+  const isSharedStyle = (hrefOrHash) => {
+    // heuristique simple :
+    // - si l'URL contient '/assets/' ou '/vendor/' ou 'bootstrap' => probablement partagée
+    // - si presente dans whitelist cfg.spaPersistentStyleWhitelist
+    if (!hrefOrHash) return false;
+    const s = hrefOrHash.toLowerCase();
+    if (cfg.spaPersistentStyleWhitelist.has(hrefOrHash)) return true;
+    if (
+      s.includes("/assets/") ||
+      s.includes("/vendor/") ||
+      s.includes("bootstrap") ||
+      s.includes("tailwind") ||
+      s.includes("bulma") ||
+      s.includes("foundation")
+    )
+      return true;
+    return false;
+  };
+
+  // ---------------------------
+  // preserveFormState(container, newFragment)
+  // copie les valeurs/selection des <input>, <textarea>, <select> et les data-* utiles
+  // pour éviter la perte d'espaces et des valeurs utilisateur lors du innerHTML replace
+  // ---------------------------
+  const preserveFormState = (container, newFragment) => {
+    try {
+      if (!container || !newFragment) return;
+      // map key -> value for inputs (use name + type + position fallback)
+      const oldInputs = container.querySelectorAll("input, textarea, select");
+      for (const old of oldInputs) {
+        try {
+          // find a matching element in newFragment by id OR name + type OR by index
+          let selector = old.id ? `#${CSS.escape(old.id)}` : null;
+          let newEl = selector ? newFragment.querySelector(selector) : null;
+
+          if (!newEl && old.name) {
+            newEl = newFragment.querySelector(`[name="${old.name}"]`);
+          }
+
+          // if not found, try same tag sequence fallback (index)
+          if (!newEl) {
+            const tag = old.tagName.toLowerCase();
+            const idx = Array.from(container.querySelectorAll(tag)).indexOf(
+              old
+            );
+            const cand = Array.from(newFragment.querySelectorAll(tag))[idx];
+            if (cand) newEl = cand;
+          }
+
+          if (!newEl) continue;
+
+          if (old.tagName.toLowerCase() === "select") {
+            try {
+              newEl.value = old.value;
+              // for multiple selects, copy selectedOptions
+              if (old.multiple && old.selectedOptions) {
+                for (const opt of newEl.options) opt.selected = false;
+                for (const opt of old.selectedOptions) {
+                  const match = Array.from(newEl.options).find(
+                    (o) => o.value === opt.value || o.text === opt.text
+                  );
+                  if (match) match.selected = true;
+                }
+              }
+            } catch (e) {}
+          } else if (old.tagName.toLowerCase() === "textarea") {
+            newEl.value = old.value;
+          } else {
+            // input
+            const type = (old.type || "").toLowerCase();
+            if (type === "checkbox" || type === "radio") {
+              newEl.checked = old.checked;
+            } else {
+              // preserve exact value (including spaces)
+              newEl.value = old.value;
+            }
+          }
+
+          // preserve selection/caret for text inputs
+          if (
+            typeof old.selectionStart === "number" &&
+            typeof old.selectionEnd === "number"
+          ) {
+            try {
+              newEl.selectionStart = old.selectionStart;
+              newEl.selectionEnd = old.selectionEnd;
+            } catch (e) {}
+          }
+
+          // preserve dataset attributes that might impact layout
+          for (const key of Object.keys(old.dataset || {})) {
+            try {
+              newEl.dataset[key] = old.dataset[key];
+            } catch (e) {}
+          }
+        } catch (e) {
+          if (cfg.debug)
+            console.debug("preserveFormState: element copy failed", e);
+        }
+      }
+    } catch (err) {
+      if (cfg.debug) console.debug("preserveFormState error", err);
+    }
+  };
+
+  // ---------------------------
+  // runHeadScripts améliorée (déjà présent mais légèrement raffiné)
+  // - respecte type/module
+  // - dedupe via loadedScripts / inlineScriptHashes
+  // - returns nothing
+  // ---------------------------
+  const runHeadScripts = (doc) => {
+    if (!cfg.execHeadScripts) return;
+    try {
+      const scripts = [
+        ...(doc.head ? doc.head.querySelectorAll("script") : []),
+      ];
+      for (const old of scripts) {
+        try {
+          const type = old.type || "text/javascript";
+          if (old.src) {
+            const src = old.src.split("#")[0];
+            if (!loadedScripts.has(src)) {
+              const s = document.createElement("script");
+              s.src = src;
+              s.type = type;
+              if (old.async) s.async = true;
+              if (old.defer) s.defer = true;
+              // if module, keep as module
+              if (type === "module") s.type = "module";
+              s.addEventListener("load", () => loadedScripts.add(src));
+              s.addEventListener("error", () => {
+                loadedScripts.add(src);
+                if (cfg.debug)
+                  console.error("[SPA] head script load error:", src);
+              });
+              // append to body to avoid blocking head parsing in SPA
+              document.body.appendChild(s);
+            }
+          } else {
+            const txt = old.textContent || "";
+            const h = hashString(txt);
+            if (!inlineScriptHashes.has(h)) {
+              const s = document.createElement("script");
+              if (type) s.type = type;
+              s.textContent = txt;
+              document.body.appendChild(s);
+              inlineScriptHashes.add(h);
+            }
+          }
+        } catch (err) {
+          console.error("SPA head script exec error:", err);
+        }
+      }
+    } catch (err) {
+      console.debug("runHeadScripts error:", err);
+    }
+  };
+
+  // ---------------------------
+  // runPageStylesAsync améliorée + nettoyage selon cfg.spaPageCleanupStrategy
+  // - marque data-spa-page si l'élément distant le demande
+  // - construit addedPageKeys (hrefs/hashes) pour la nouvelle page
+  // - applique cleanup selon strategy: "keep-shared" | "remove-all" | "strict"
+  // ---------------------------
   const runPageStylesAsync = (doc) => {
     if (!doc) return Promise.resolve();
 
-    const linkNodes = [...doc.querySelectorAll('link[rel="stylesheet"]')];
+    const linkNodes = [
+      ...doc.querySelectorAll(
+        'link[rel="stylesheet"], link[rel="preload"][as="style"]'
+      ),
+    ];
     const styleNodes = [...doc.querySelectorAll("style")];
 
     const loadPromises = [];
+    const addedPageKeys = new Set(); // hrefs / hashes marqués page-scoped ajoutés maintenant
 
-    // 1) process <link rel="stylesheet">
     for (const l of linkNodes) {
       try {
         const hrefAttr = l.getAttribute("href") || l.href;
         if (!hrefAttr) continue;
         const abs = new URL(hrefAttr, location.href).href.split("#")[0];
 
-        // skip if already loaded
-        if (loadedStyles.has(abs)) continue;
+        if (loadedStyles.has(abs)) {
+          if (l.hasAttribute("data-spa-page")) addedPageKeys.add(abs);
+          continue;
+        }
 
-        // create a <link> element with load/error handling
         const nl = document.createElement("link");
-        nl.rel = "stylesheet";
+        const rel = l.getAttribute("rel") || "stylesheet";
+        nl.rel = rel === "preload" ? "stylesheet" : rel;
         nl.href = abs;
+
+        if (l.hasAttribute("data-spa-page")) {
+          nl.setAttribute("data-spa-page", "1");
+          addedPageKeys.add(abs);
+        }
+
         nl.dataset.spa = "true";
 
         const p = new Promise((resolve) => {
           let done = false;
-
           const clean = () => {
             nl.removeEventListener("load", onload);
             nl.removeEventListener("error", onerror);
             done = true;
           };
-
           const onload = () => {
             clean();
             loadedStyles.add(abs);
             resolve({ href: abs, ok: true });
           };
-
           const onerror = () => {
             clean();
             loadedStyles.add(abs);
@@ -363,127 +520,308 @@ const SPA = (function () {
           nl.addEventListener("load", onload);
           nl.addEventListener("error", onerror);
 
-          // fallback timeout (avoid hanging forever)
           setTimeout(() => {
             if (!done) {
               clean();
               loadedStyles.add(abs);
               resolve({ href: abs, ok: false, timeout: true });
             }
-          }, STYLE_LOAD_TIMEOUT_MS);
+          }, cfg.styleLoadTimeoutMs || STYLE_LOAD_TIMEOUT_MS);
         });
 
-        // append to <head> (starts the download)
         document.head.appendChild(nl);
         loadPromises.push(p);
       } catch (err) {
-        console.debug("SPA style link skipped:", err);
+        console.debug("SPA style link skip:", err);
       }
     }
 
-    // 2) process inline <style> tags (synchronously)
     for (const s of styleNodes) {
       try {
         const txt = s.textContent || "";
         const h = hashString(txt);
-
-        // avoid duplicate inline styles
         if (!inlineStyleHashes.has(h)) {
           const ns = document.createElement("style");
           ns.textContent = txt;
+          if (s.hasAttribute("data-spa-page")) {
+            ns.setAttribute("data-spa-page", "1");
+            addedPageKeys.add(h);
+          }
           ns.dataset.spa = "true";
           document.head.appendChild(ns);
           inlineStyleHashes.add(h);
-          // no need to wait, inline styles apply instantly
+        } else {
+          if (s.hasAttribute("data-spa-page")) addedPageKeys.add(h);
         }
       } catch (err) {
-        console.debug("SPA inline style skipped:", err);
+        console.debug("SPA inline style skip:", err);
       }
     }
 
-    // if nothing to wait for → resolve immediately
-    if (loadPromises.length === 0) return Promise.resolve();
+    // CLEANUP selon strategy
+    try {
+      if (cfg.cleanPageScopedStyles) {
+        const existing = [
+          ...document.head.querySelectorAll(
+            '[data-spa-page], [data-spa="true"]'
+          ),
+        ];
+        for (const node of existing) {
+          try {
+            let key = null;
+            const tag = node.tagName.toLowerCase();
+            if (tag === "link")
+              key = node.href ? node.href.split("#")[0] : null;
+            else if (tag === "style") key = hashString(node.textContent || "");
 
-    // wait for all stylesheet promises (each has its own timeout)
-    return Promise.all(loadPromises).then((results) => {
-      // debug failed or timed-out styles
-      const failed = results.filter((r) => !r.ok);
-      if (failed.length && cfg.debug) {
-        console.debug("[SPA] Some styles failed to load or timed out:", failed);
+            // ne pas tenter de supprimer les whitelisted persistent
+            if (cfg.spaPersistentStyleWhitelist.has(key)) continue;
+
+            const inAdded = key && addedPageKeys.has(key);
+
+            if (cfg.spaPageCleanupStrategy === "keep-shared") {
+              // remove only those that were explicitly page-scoped and not present now
+              if (node.hasAttribute("data-spa-page") && !inAdded) {
+                node.remove();
+              }
+              // keep everything else (shared or not-marked)
+            } else if (cfg.spaPageCleanupStrategy === "remove-all") {
+              // remove any SPA-injected node that is not present in current page
+              if (!inAdded) {
+                node.remove();
+              }
+            } else if (cfg.spaPageCleanupStrategy === "strict") {
+              // stricter: remove node if not in addedPageKeys and not obviously shared
+              if (!inAdded) {
+                if (key && !isSharedStyle(key)) {
+                  node.remove();
+                } else if (!key) {
+                  // conservative: if no key, remove (it's likely an inline page style)
+                  node.remove();
+                }
+              }
+            } else {
+              // fallback safe = keep-shared behavior
+              if (node.hasAttribute("data-spa-page") && !inAdded) node.remove();
+            }
+          } catch (e) {
+            if (cfg.debug) console.debug("cleanup node failed", e);
+          }
+        }
       }
+    } catch (err) {
+      if (cfg.debug) console.debug("cleanPageScopedStyles error", err);
+    }
+
+    if (loadPromises.length === 0) return Promise.resolve();
+    return Promise.all(loadPromises).then((results) => {
+      const failed = results.filter((r) => !r.ok);
+      if (failed.length && cfg.debug)
+        console.debug("[SPA] some styles failed or timed out:", failed);
       return results;
     });
   };
 
-  // ---------------------------------------------------------
-  // PAGE LOAD CORE (Safe & SPA-friendly)
-  // ---------------------------------------------------------
+  // ---------------------------
+  // runPageScripts améliorée (respect type/module, dedupe, onerror)
+  // ---------------------------
+  const runPageScripts = (container) => {
+    if (!container) return;
+    const scripts = [...container.querySelectorAll("script")];
+    for (const old of scripts) {
+      try {
+        const type = old.type || "text/javascript";
+        if (old.src) {
+          const src = old.src.split("#")[0];
+          if (!loadedScripts.has(src)) {
+            const s = document.createElement("script");
+            s.src = src;
+            s.type = type;
+            if (old.async) s.async = true;
+            if (old.defer) s.defer = true;
+            if (type === "module") s.type = "module";
+            s.addEventListener("load", () => loadedScripts.add(src));
+            s.addEventListener("error", () => {
+              loadedScripts.add(src);
+              if (cfg.debug) console.error("[SPA] script load error:", src);
+            });
+            document.body.appendChild(s);
+          }
+        } else {
+          const txt = old.textContent || "";
+          const h = hashString(txt);
+          if (!inlineScriptHashes.has(h)) {
+            const s = document.createElement("script");
+            s.type = type;
+            s.textContent = txt;
+            document.body.appendChild(s);
+            inlineScriptHashes.add(h);
+          }
+        }
+      } catch (err) {
+        console.error("SPA script exec error:", err);
+      }
+      try {
+        old.remove();
+      } catch (e) {}
+    }
+  };
+
+  // ---------------------------
+  // utilitaire debug : log computed margins d'un selecteur
+  // ---------------------------
+  const logComputedMargins = (selector, tag = "") => {
+    const el = document.querySelector(selector);
+    if (!el) {
+      console.warn(
+        `[SPA] logComputedMargins: element not found ${selector}`,
+        tag
+      );
+      return;
+    }
+    const cs = getComputedStyle(el);
+    console.log(`[SPA] computed margins ${selector} ${tag}:`, {
+      marginTop: cs.marginTop,
+      marginRight: cs.marginRight,
+      marginBottom: cs.marginBottom,
+      marginLeft: cs.marginLeft,
+    });
+  };
+
+  const syncHtmlAndBodyAttrs = (doc) => {
+    if (!doc) return;
+    // Copier les classes et attributs de <html>
+    document.documentElement.className = doc.documentElement.className;
+    for (const attr of doc.documentElement.attributes) {
+      if (attr.name !== "class")
+        document.documentElement.setAttribute(attr.name, attr.value);
+    }
+
+    // Copier les classes et attributs de <body>
+    document.body.className = doc.body.className;
+    for (const attr of doc.body.attributes) {
+      if (attr.name !== "class")
+        document.body.setAttribute(attr.name, attr.value);
+    }
+  };
+
+  window.__runHljs = async function () {
+    // Attendre que hljs soit chargé
+    if (!window.hljs) {
+      await new Promise((resolve) => {
+        const check = () => {
+          if (window.hljs) resolve();
+          else setTimeout(check, 50);
+        };
+        check();
+      });
+    }
+
+    // Configurer Highlight.js
+    hljs.configure({
+      languages: [
+        "php",
+        "javascript",
+        "json",
+        "bash",
+        "html",
+        "css",
+        "ini",
+        "yaml",
+      ],
+    });
+
+    // Highlight tout le code
+    document.querySelectorAll(".markdown-body pre code").forEach((el) => {
+      hljs.highlightElement(el);
+    });
+  };
+
+  // ---------------------------
+  // loadPage final (avec cleanup page-scoped + robustifications)
+  // ---------------------------
   const loadPage = async (url, push = true) => {
     if (!appContainer) return (location.href = url);
 
     try {
-      // Retrieve HTML (from cache or network)
       const html = cacheGet(url) ?? (await fetchFragment(url));
 
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
 
-      // Update the document title if present
+      if (cfg.debug) log("[SPA] parsed doc for", url);
+
+      // debug margins before
+      // logComputedMargins('.main-content', 'before');
+      console.log("[SPA] Step 1: syncHtmlAndBodyAttrs");
+
+      // 1) Sync <html> et <body> (classes/attrs)
+      syncHtmlAndBodyAttrs(doc);
+
+      console.log("[SPA] Step 2: runHeadScripts");
+      // 2) Exécuter scripts head si configuré (utile à la copie des classes)
+      if (cfg.execHeadScripts) runHeadScripts(doc);
+
+      console.log("[SPA] Step 3: update title");
+      // 3) update title
       if (doc.title) document.title = doc.title;
 
-      // Look for the SPA fragment (#app), fallback to <body>
+      // 4) sélectionner fragment
       const newFragment = doc.querySelector(cfg.containerSelector) || doc.body;
 
-      // --- Hide the container to avoid visual flashes ---
-      // Safeguard: preserve any existing inline style
+      // 5) masquer container (prévenir flash)
       const prevVisibility = appContainer.style.visibility;
       const prevOpacity = appContainer.style.opacity;
       appContainer.style.visibility = "hidden";
       appContainer.style.opacity = "0";
 
-      // Inject / sync remote page styles and wait for them to load
+      // 6) injecter styles et attendre
       await runPageStylesAsync(doc);
 
-      // Replace the current content AFTER styles have been applied
+      // avant : appContainer.innerHTML = newFragment.innerHTML;
+      preserveFormState(appContainer, newFragment);
       appContainer.innerHTML = newFragment.innerHTML;
 
-      // Execute page scripts
+      // 8) exécuter scripts du fragment
       runPageScripts(appContainer);
 
-      // Reinitialize SPA link handlers
+      // Trigger Highlight.js safely
+      if (window.__runHljs) {
+        window.__runHljs();
+      }
+
+      // 9) ré-initialiser handlers
       initLinkHandlers();
 
-      // Restore visibility and trigger entrance transition
-      // Small delay so the browser can paint the applied styles first
+      // 10) restaurer visibilité + transition
       setTimeout(() => {
         appContainer.style.visibility = prevVisibility || "";
         appContainer.style.opacity = prevOpacity || "";
         applyTransitionIn(appContainer);
       }, 10);
 
-      // Update browser history
+      // 11) history / nav active
       if (push) {
         history.pushState(null, "", url);
-        updateActiveLinks(url); // highlight active link
+        updateActiveLinks(url);
       } else {
-        updateActiveLinks(); // popstate event
+        updateActiveLinks();
       }
 
-      // Scroll to top
+      // 12) scroll to top
       scrollTo(0, 0);
+
+      // debug margins after
+      // logComputedMargins('.main-content', 'after');
 
       return true;
     } catch (err) {
       console.error("SPA loadPage error:", err);
-
-      // Display a proper error message only if the fetch failed
       if (err instanceof TypeError || err.message.includes("Failed to fetch")) {
         showError("Failed to fetch page. Redirecting...");
       } else {
         showError("Unexpected SPA error. Reloading...");
       }
-
-      // Fallback full page reload
       setTimeout(() => (location.href = url), 1500);
       return false;
     }

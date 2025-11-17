@@ -3,13 +3,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const y = document.getElementById("y");
   if (y) y.textContent = new Date().getFullYear();
 
-  // Highlight.js si présent
-  if (window.hljs) {
-    document.querySelectorAll(".code-body pre code").forEach((el) => {
-      window.hljs.highlightElement(el);
-    });
-  }
-
   // Boutons Copy
   document.querySelectorAll(".code-copy").forEach((btn) => {
     btn.addEventListener("click", async () => {
