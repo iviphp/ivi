@@ -34,6 +34,7 @@
             <img class="mk-logo" src="<?= module_asset('Market/Core', 'softadastra-market.png') ?>" alt="Softadastra Market">
             <h1 class="mk-title"><?= e($title ?? 'Softadastra Market') ?></h1>
             <p class="mk-subtitle">Cross-border commerce · Modules ivi.php · Ultra-rapide</p>
+            <p class="mk-subtitle"><?= $message ?></p>
 
             <div class="mk-cta">
                 <a class="mk-btn mk-btn-primary" href="/market">Explorer le marché</a>

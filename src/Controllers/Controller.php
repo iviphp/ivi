@@ -81,10 +81,18 @@ abstract class Controller
         self::$layoutVars[$key] = $value;
     }
 
-    /** Raccourci pratique pour le titre de page */
-    protected function setPageTitle(string $title): void
+    /**
+     * Shortcut to set the page title safely.
+     * 
+     * @param string|null $title Page title. If null, a default will be used.
+     */
+    protected function setPageTitle(?string $title): void
     {
-        $this->setLayoutVar('title', $title);
+        // fallback si null
+        $safeTitle = $title ?? 'Softadastra';
+
+        // assure que c'est bien une string
+        $this->setLayoutVar('title', (string)$safeTitle);
     }
 
     /**

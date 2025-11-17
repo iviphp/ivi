@@ -5,24 +5,64 @@ declare(strict_types=1);
 namespace Ivi\Core\Bootstrap;
 
 use Dotenv\Dotenv;
+use Ivi\Core\Config\Config;
 
+/**
+ * Class Loader
+ *
+ * Bootstraps the application:
+ *  - Prepares and loads the .env file
+ *  - Initializes the configuration system
+ *  - Defines global constants (including Google OAuth)
+ *  - Configures Cloudinary if present
+ *
+ * Usage:
+ *   Loader::bootstrap(BASE_PATH);
+ */
 final class Loader
 {
+    /**
+     * Bootstrap the application
+     */
     public static function bootstrap(string $baseDir): void
     {
+        // 1️⃣ Préparer .env
         self::prepareEnvFile($baseDir);
+
+        // 2️⃣ Charger le .env
         self::loadEnv($baseDir);
-        self::defineConstants($baseDir);
+
+        // 2b️⃣ Définir les constantes nécessaires aux fichiers config
+        self::defineEarlyConstants();
+
+        // 3️⃣ Initialiser Config avec tous les fichiers config/*.php sauf routes.php
+        self::initConfig($baseDir);
+
+        // 4️⃣ Définir les autres constantes globales
+        self::defineConstants();
+
+        // 5️⃣ Configurer Cloudinary si présent
         self::configureCloudinary();
     }
 
     /**
-     * Si aucun .env n'existe, on copie .env.example
+     * Définir les constantes utilisées dans les fichiers config (avant init Config)
+     */
+    private static function defineEarlyConstants(): void
+    {
+        defined('GOOGLE_CLIENT_ID')     || define('GOOGLE_CLIENT_ID', $_ENV['GOOGLE_CLIENT_ID'] ?? '');
+        defined('GOOGLE_CLIENT_SECRET') || define('GOOGLE_CLIENT_SECRET', $_ENV['GOOGLE_CLIENT_SECRET'] ?? '');
+        defined('GOOGLE_REDIRECT_URI')  || define('GOOGLE_REDIRECT_URI', $_ENV['GOOGLE_REDIRECT_URI'] ?? '');
+        defined('GOOGLE_SCOPES')       || define('GOOGLE_SCOPES', $_ENV['GOOGLE_SCOPES'] ?? 'email,profile');
+    }
+
+    /**
+     * Copy .env.example → .env if missing
      */
     private static function prepareEnvFile(string $baseDir): void
     {
-        $envPath       = $baseDir . '/.env';
-        $examplePath   = $baseDir . '/.env.example';
+        $envPath     = $baseDir . '/.env';
+        $examplePath = $baseDir . '/.env.example';
 
         if (!is_file($envPath) && is_file($examplePath)) {
             @copy($examplePath, $envPath);
@@ -31,11 +71,11 @@ final class Loader
     }
 
     /**
-     * Chargement du fichier .env (ou .env.{APP_ENV})
+     * Load the appropriate .env file
      */
     private static function loadEnv(string $baseDir): void
     {
-        $envFile = '.env';
+        $envFile       = '.env';
         $envFromServer = $_SERVER['APP_ENV'] ?? $_ENV['APP_ENV'] ?? null;
 
         if ($envFromServer) {
@@ -45,33 +85,50 @@ final class Loader
             }
         }
 
-        // safeLoad() ne jette pas d’exception si le fichier est absent
         $dotenv = Dotenv::createImmutable($baseDir, $envFile);
         $dotenv->safeLoad();
     }
 
     /**
-     * Définitions de constantes globales
+     * Initialize configuration system
      */
-    private static function defineConstants(string $baseDir): void
+    private static function initConfig(string $baseDir): void
     {
-        defined('BASE_PATH') || define('BASE_PATH', $baseDir);
-        defined('VIEWS')     || define('VIEWS', $baseDir . '/views/');
-        defined('APP_ENV')   || define('APP_ENV', $_ENV['APP_ENV'] ?? 'prod');
-
-        defined('JWT_SECRET') || define('JWT_SECRET', $_ENV['JWT_SECRET']);
-        defined('CLOUDINARY_FOLDER') || define('CLOUDINARY_FOLDER', $_ENV['CLOUDINARY_FOLDER'] ?? 'softadastra/good');
-
-        defined('GOOGLE_CLIENT_ID') || define('GOOGLE_CLIENT_ID', $_ENV['GOOGLE_CLIENT_ID'] ?? null);
-        defined('GOOGLE_CLIENT_SECRET') || define('GOOGLE_CLIENT_SECRET', $_ENV['GOOGLE_CLIENT_SECRET'] ?? null);
-        defined('GOOGLE_REDIRECT_URI') || define('GOOGLE_REDIRECT_URI', $_ENV['GOOGLE_REDIRECT_URI'] ?? null);
-
-        // NEW → Scopes dynamiques depuis .env
-        defined('GOOGLE_SCOPES') || define('GOOGLE_SCOPES', $_ENV['GOOGLE_SCOPES'] ?? 'email,profile');
+        Config::init($baseDir . '/config');
     }
 
     /**
-     * Configuration automatique de Cloudinary si présent
+     * Define global constants from config
+     */
+    private static function defineConstants(): void
+    {
+        defined('BASE_PATH') || define('BASE_PATH', dirname(__DIR__, 2));
+        defined('VIEWS')     || define('VIEWS', BASE_PATH . '/views');
+
+        defined('APP_ENV')   || define('APP_ENV', Config::get('app.env', 'prod'));
+        defined('JWT_SECRET') || define('JWT_SECRET', Config::get('app.jwt_secret', 'change_me'));
+
+        // Cloudinary
+        $cloudinary = Config::get('cloudinary', []);
+        defined('CLOUDINARY_FOLDER') || define('CLOUDINARY_FOLDER', $cloudinary['folder'] ?? 'softadastra/good');
+
+        // Google OAuth (déjà défini plus tôt mais on peut harmoniser les valeurs avec config)
+        $google = Config::get('google', []);
+        defined('GOOGLE_CLIENT_ID')     || define('GOOGLE_CLIENT_ID', $google['client_id'] ?? GOOGLE_CLIENT_ID);
+        defined('GOOGLE_CLIENT_SECRET') || define('GOOGLE_CLIENT_SECRET', $google['client_secret'] ?? GOOGLE_CLIENT_SECRET);
+        defined('GOOGLE_REDIRECT_URI')  || define('GOOGLE_REDIRECT_URI', $google['redirect_uri'] ?? GOOGLE_REDIRECT_URI);
+
+        $scopes = $google['scopes'] ?? GOOGLE_SCOPES;
+        if (is_array($scopes)) {
+            $scopes = implode(' ', $scopes);
+        } else {
+            $scopes = str_replace(',', ' ', $scopes);
+        }
+        defined('GOOGLE_SCOPES') || define('GOOGLE_SCOPES', $scopes);
+    }
+
+    /**
+     * Configure Cloudinary if class exists
      */
     private static function configureCloudinary(): void
     {
@@ -79,19 +136,22 @@ final class Loader
             return;
         }
 
-        $cloud = [
-            'cloud_name' => $_ENV['CLOUDINARY_CLOUD_NAME'] ?? '',
-            'api_key'    => $_ENV['CLOUDINARY_API_KEY'] ?? '',
-            'api_secret' => $_ENV['CLOUDINARY_API_SECRET'] ?? '',
-        ];
+        $cloud = Config::get('cloudinary', []);
+        $cloudName = $cloud['cloud_name'] ?? '';
+        $apiKey    = $cloud['api_key'] ?? '';
+        $apiSecret = $cloud['api_secret'] ?? '';
 
-        if ($cloud['cloud_name'] === '' || $cloud['api_key'] === '' || $cloud['api_secret'] === '') {
+        if (empty($cloudName) || empty($apiKey) || empty($apiSecret)) {
             return;
         }
 
         \Cloudinary\Configuration\Configuration::instance([
-            'cloud' => $cloud,
-            'url'   => ['secure' => true],
+            'cloud' => [
+                'cloud_name' => $cloudName,
+                'api_key'    => $apiKey,
+                'api_secret' => $apiSecret,
+            ],
+            'url' => ['secure' => true],
         ]);
     }
 }

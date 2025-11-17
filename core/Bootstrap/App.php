@@ -9,6 +9,7 @@ use Ivi\Core\Router\Router;
 use Ivi\Core\Debug\Logger;
 use Ivi\Core\Exceptions\ExceptionHandler;
 use App\Modules\ModuleRegistry;
+use Ivi\Core\Cache\Cache;
 
 /**
  * Class App
@@ -40,6 +41,8 @@ final class App
     /** @var callable|null A custom resolver for controller dependencies */
     private $resolver = null;
 
+    public Cache $cache;
+
     /**
      * Create a new ivi.php Application instance.
      *
@@ -50,6 +53,7 @@ final class App
     {
         $this->baseDir  = rtrim($baseDir, DIRECTORY_SEPARATOR);
         $this->resolver = $resolver;
+        $this->cache = Cache::getInstance();
 
         // 1) Bootstrap environment, constants, and external services
         Loader::bootstrap($this->baseDir);
