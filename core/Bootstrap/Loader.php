@@ -105,6 +105,8 @@ final class Loader
         defined('BASE_PATH') || define('BASE_PATH', dirname(__DIR__, 2));
         defined('VIEWS')     || define('VIEWS', BASE_PATH . '/views');
 
+        defined('IVI_LOG_FILE') || define('IVI_LOG_FILE', BASE_PATH . '/storage/logs/ivi.log');
+
         defined('APP_ENV')   || define('APP_ENV', Config::get('app.env', 'prod'));
         defined('JWT_SECRET') || define('JWT_SECRET', Config::get('app.jwt_secret', 'change_me'));
 

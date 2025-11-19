@@ -637,3 +637,63 @@ if (!function_exists('config_value')) {
         return \Ivi\Core\Config\Config::get($key, $default);
     }
 }
+
+if (!function_exists('log_msg')) {
+    /**
+     * Global logging helper with console filtering.
+     *
+     * @param mixed       $value The data to log
+     * @param string|null $label Optional label
+     * @param string      $level One of: info, debug, warning, error
+     * @param bool        $json  Whether to log in JSON format
+     * @param bool        $trace Whether to include stack trace
+     */
+    function log_msg(
+        mixed $value,
+        ?string $label = null,
+        string $level = 'info',
+        bool $json = false,
+        bool $trace = false
+    ): void {
+        // Écrire dans le fichier
+        \Ivi\Core\Debug\Debug::log($value, $label, $level, $json, $trace);
+
+        // Filtrage console
+        $consoleMinLevel = 'info'; // 'debug', 'info', 'warning', 'error'
+        $levels = ['debug' => 1, 'info' => 2, 'warning' => 3, 'error' => 4];
+        if (PHP_SAPI === 'cli' && ($levels[strtolower($level)] ?? 2) >= ($levels[$consoleMinLevel] ?? 2)) {
+            // Afficher en console seulement si >= consoleMinLevel
+            $msg = $json ? json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : print_r($value, true);
+            $labelStr = $label ? "[$label] " : '';
+            echo strtoupper($level) . " {$labelStr}{$msg}\n";
+        }
+    }
+}
+
+if (!function_exists('log_info')) {
+    function log_info(mixed $value, ?string $label = null): void
+    {
+        log_msg($value, $label, 'info');
+    }
+}
+
+if (!function_exists('log_debug')) {
+    function log_debug(mixed $value, ?string $label = null): void
+    {
+        log_msg($value, $label, 'debug');
+    }
+}
+
+if (!function_exists('log_warning')) {
+    function log_warning(mixed $value, ?string $label = null): void
+    {
+        log_msg($value, $label, 'warning');
+    }
+}
+
+if (!function_exists('log_error')) {
+    function log_error(mixed $value, ?string $label = null): void
+    {
+        log_msg($value, $label, 'error');
+    }
+}
