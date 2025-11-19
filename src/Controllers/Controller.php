@@ -137,10 +137,16 @@ abstract class Controller
         $isSPA  = ($params['spa'] ?? false);
 
         /**
-         * 🚀 CAS 1 : SPA + AJAX = on renvoie le fragment sans layout
+         * 🚀 CAS 1 : SPA + AJAX = on renvoie le fragment + header du titre
          */
         if ($isSPA && $isAjax) {
-            return new HtmlResponse($content, $status);
+            $pageTitle = self::$layoutVars['title']
+                ?? ($params['title'] ?? 'Softadastra');
+
+            $response = new HtmlResponse($content, $status);
+            $response->header('X-Page-Title', $pageTitle);
+
+            return $response;
         }
 
         /**
@@ -155,12 +161,11 @@ abstract class Controller
 
         // Capture du layout complet
         $full = $this->capture(function () use ($layoutPath, $content, $params) {
+            // Injecte les variables de layout et les params
+            $title = self::$layoutVars['title'] ?? ($params['title'] ?? 'Softadastra');
+
             if (!empty(self::$layoutVars)) extract(self::$layoutVars, EXTR_OVERWRITE);
             if (is_array($params)) extract($params, EXTR_OVERWRITE);
-
-            if (!isset($title) || !$title) {
-                $title = 'ivi.php';
-            }
 
             // Flag SPA pour le JS global (spa.js)
             echo '<script>window.__SPA__ = true;</script>';
@@ -170,6 +175,7 @@ abstract class Controller
 
         return new HtmlResponse($full, $status);
     }
+
 
 
     /**

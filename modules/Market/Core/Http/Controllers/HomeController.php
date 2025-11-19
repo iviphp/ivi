@@ -71,14 +71,12 @@ final class HomeController extends Controller
             return "Hello ! (generated at " . date('H:i:s') . " | fresh)";
         });
 
-        $title = $this->setPageTitle('market.title');
-
         // favicon spécifique au module
         $favicon = module_asset('Market/Core', 'softadastra-market.png');
         $css     = module_asset('Market/Core', 'assets/css/style.css');
 
         return $this->view('market::home', [
-            'title'   => $title,
+            'title'   => 'Market Title',
             'favicon' => $favicon,
             'styles'     => $css,
             'message' => $message
