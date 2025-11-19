@@ -40,7 +40,8 @@
     <?php include base_path('views/partials/header.php'); ?>
 
     <!-- SPA container -->
-    <main id="app" class="min-vh-100 p-4 container">
+    <main id="app" class="min-vh-100 p-4 container"
+        data-title="<?= htmlspecialchars($params['title'] ?? $title ?? 'Softadastra') ?>">
         <?= $content ?? '' ?>
     </main>
 

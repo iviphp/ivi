@@ -86,7 +86,10 @@ final class UserController extends Controller
         $users = array_map(fn($r) => new User($r), $rows);
         $pageDto = new Pagination($users, $total, $perPage, $page);
 
-        return $this->view('user.index', ['page' => $pageDto]);
+        return $this->view('user.index', [
+            'title' => 'Users title',
+            'page' => $pageDto
+        ]);
     }
 
     /** Show details of a specific user by ID. */
@@ -94,13 +97,19 @@ final class UserController extends Controller
     {
         $user = User::find($id);
         if (!$user) throw new NotFoundHttpException('User not found.');
-        return $this->view('user.show', ['user' => $user]);
+
+        return $this->view('user.show', [
+            'title' => "Show " . $user->toArray()['name'],
+            'user' => $user
+        ]);
     }
 
     /** Render the "create user" form. */
     public function create(): HtmlResponse
     {
-        return $this->view('user.create');
+        return $this->view('user.create', [
+            'title' => 'Create User'
+        ]);
     }
 
     /**
@@ -140,7 +149,10 @@ final class UserController extends Controller
     {
         $user = User::find($id);
         if (!$user) throw new NotFoundHttpException('User not found.');
-        return $this->view('user.edit', ['user' => $user]);
+        return $this->view('user.edit', [
+            'title' => 'Edit ' . $user->toArray()['name'],
+            'user' => $user
+        ]);
     }
 
     /**

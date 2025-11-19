@@ -140,36 +140,29 @@ const SPA = (function () {
     log("cache cleared");
   };
 
-  // ---------------------------------------------------------
-  // FETCH
-  // ---------------------------------------------------------
-  const fetchFragment = (url) => {
-    url = normalizeUrl(url);
-
-    const cached = cacheGet(url);
-    if (cached) return Promise.resolve(cached);
-
-    if (pendingFetches.has(url)) return pendingFetches.get(url);
-
-    const p = fetch(url, {
-      headers: { "X-Requested-With": "XMLHttpRequest" },
-    })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.text();
-      })
-      .then((html) => {
-        cacheSet(url, html);
-        pendingFetches.delete(url);
-        return html;
-      })
-      .catch((err) => {
-        pendingFetches.delete(url);
-        throw err;
+  // =======================
+  // fetchFragment
+  // =======================
+  const fetchFragment = async (url) => {
+    try {
+      const response = await fetch(url, {
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "same-origin",
       });
 
-    pendingFetches.set(url, p);
-    return p;
+      if (!response.ok) {
+        throw new Error(`Fetch failed with status ${response.status}`);
+      }
+
+      const html = await response.text();
+      // Lire le header X-Page-Title envoyé par le serveur
+      const headerTitle = response.headers.get("X-Page-Title") || null;
+
+      return { html, headerTitle };
+    } catch (e) {
+      console.error("[SPA] fetchFragment error:", e);
+      throw e;
+    }
   };
 
   const prefetch = (url) => {
@@ -737,6 +730,22 @@ const SPA = (function () {
     });
   };
 
+  // --- Title helper (INTERNALS) ---
+  let lastSpaTitle = null;
+  const setSpaTitle = (t) => {
+    if (!t) return;
+    try {
+      const s = String(t).trim();
+      if (!s) return;
+      lastSpaTitle = s;
+      document._spaTitleRequest = s; // compat
+      document.title = s;
+      if (cfg.debug) console.log("[SPA] setSpaTitle ->", s);
+    } catch (e) {
+      if (cfg.debug) console.debug("[SPA] setSpaTitle failed", e);
+    }
+  };
+
   // ---------------------------
   // loadPage final (avec cleanup page-scoped + robustifications)
   // ---------------------------
@@ -744,63 +753,109 @@ const SPA = (function () {
     if (!appContainer) return (location.href = url);
 
     try {
-      const html = cacheGet(url) ?? (await fetchFragment(url));
+      // 1) récupérer HTML + headerTitle
+      let html,
+        headerTitle = null;
+      const cached = cacheGet(url);
+      if (cached) {
+        html = cached;
+      } else {
+        const res = await fetchFragment(url); // { html, headerTitle }
+        html = res.html;
+        headerTitle = res.headerTitle;
+      }
 
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
 
-      if (cfg.debug) log("[SPA] parsed doc for", url);
-
-      // debug margins before
-      // logComputedMargins('.main-content', 'before');
-      console.log("[SPA] Step 1: syncHtmlAndBodyAttrs");
-
-      // 1) Sync <html> et <body> (classes/attrs)
+      // 2) synchroniser <html> et <body> (classes/attrs)
       syncHtmlAndBodyAttrs(doc);
 
-      console.log("[SPA] Step 2: runHeadScripts");
-      // 2) Exécuter scripts head si configuré (utile à la copie des classes)
+      // 3) exécuter scripts head si configuré
       if (cfg.execHeadScripts) runHeadScripts(doc);
 
-      console.log("[SPA] Step 3: update title");
-      // 3) update title
-      if (doc.title) document.title = doc.title;
+      // 4) helper pour extraire les titres
+      const pickTitleFromDoc = (d) => {
+        try {
+          const docTitle = d.title?.trim() || null;
+          const og =
+            d
+              .querySelector('meta[property="og:title"]')
+              ?.getAttribute("content") || null;
+          const metaName =
+            d.querySelector('meta[name="title"]')?.getAttribute("content") ||
+            null;
+          return { docTitle, og, metaName };
+        } catch (e) {
+          return { docTitle: null, og: null, metaName: null };
+        }
+      };
 
-      // 4) sélectionner fragment
+      // 5) première passe titre : priorité headerTitle > doc.title > meta
+      if (headerTitle?.trim()) {
+        setSpaTitle(headerTitle.trim());
+      } else {
+        const cand = pickTitleFromDoc(doc);
+        if (cand.docTitle) setSpaTitle(cand.docTitle);
+        else if (cand.og) setSpaTitle(cand.og);
+        else if (cand.metaName) setSpaTitle(cand.metaName);
+      }
+
+      // 6) sélectionner fragment principal
       const newFragment = doc.querySelector(cfg.containerSelector) || doc.body;
 
-      // 5) masquer container (prévenir flash)
+      // 7) masquer container pour éviter flash
       const prevVisibility = appContainer.style.visibility;
       const prevOpacity = appContainer.style.opacity;
       appContainer.style.visibility = "hidden";
       appContainer.style.opacity = "0";
 
-      // 6) injecter styles et attendre
+      // 8) appliquer styles async
       await runPageStylesAsync(doc);
 
-      // avant : appContainer.innerHTML = newFragment.innerHTML;
+      // 9) préserver états forms et injecter le fragment
       preserveFormState(appContainer, newFragment);
       appContainer.innerHTML = newFragment.innerHTML;
 
-      // 8) exécuter scripts du fragment
-      runPageScripts(appContainer);
+      // 10) mettre à jour data-spa-title après injection
+      try {
+        if (headerTitle?.trim()) {
+          appContainer.setAttribute("data-spa-title", headerTitle.trim());
+        } else {
+          const fragTitleAttr =
+            newFragment.getAttribute("data-spa-title") ||
+            newFragment.getAttribute("data-title") ||
+            newFragment
+              .querySelector("[data-title]")
+              ?.getAttribute("data-title") ||
+            null;
 
-      // Trigger Highlight.js safely
-      if (window.__runHljs) {
-        window.__runHljs();
+          if (fragTitleAttr?.trim()) {
+            setSpaTitle(fragTitleAttr.trim());
+            appContainer.setAttribute("data-spa-title", fragTitleAttr.trim());
+          }
+        }
+      } catch (e) {
+        if (cfg.debug) console.debug("[SPA] fragment title update failed", e);
       }
 
-      // 9) ré-initialiser handlers
+      // 11) exécuter scripts fragment
+      runPageScripts(appContainer);
+
+      // 12) syntax highlighting
+      if (window.__runHljs) window.__runHljs();
+
+      // 13) ré-init handlers
       initLinkHandlers();
 
-      // 10) restaurer visibilité + transition
+      // 14) restaurer visibilité + transition
       setTimeout(() => {
         appContainer.style.visibility = prevVisibility || "";
         appContainer.style.opacity = prevOpacity || "";
         applyTransitionIn(appContainer);
       }, 10);
 
-      // 11) history / nav active
+      // 15) navigation history et active links
       if (push) {
         history.pushState(null, "", url);
         updateActiveLinks(url);
@@ -808,20 +863,36 @@ const SPA = (function () {
         updateActiveLinks();
       }
 
-      // 12) scroll to top
+      // 16) scroll top
       scrollTo(0, 0);
 
-      // debug margins after
-      // logComputedMargins('.main-content', 'after');
+      // 17) second-pass title update après petit délai
+      setTimeout(() => {
+        try {
+          const fragAttrNow =
+            appContainer.getAttribute("data-spa-title") ||
+            appContainer.getAttribute("data-title") ||
+            appContainer
+              .querySelector("[data-title]")
+              ?.getAttribute("data-title") ||
+            null;
+
+          if (fragAttrNow?.trim()) setSpaTitle(fragAttrNow.trim());
+          else {
+            const cand2 = pickTitleFromDoc(doc);
+            if (cand2.docTitle) setSpaTitle(cand2.docTitle);
+            else if (cand2.og) setSpaTitle(cand2.og);
+            else if (cand2.metaName) setSpaTitle(cand2.metaName);
+          }
+        } catch (e) {
+          if (cfg.debug) console.debug("[SPA] second-pass title error", e);
+        }
+      }, cfg.titleUpdateDelayMs ?? 60);
 
       return true;
     } catch (err) {
       console.error("SPA loadPage error:", err);
-      if (err instanceof TypeError || err.message.includes("Failed to fetch")) {
-        showError("Failed to fetch page. Redirecting...");
-      } else {
-        showError("Unexpected SPA error. Reloading...");
-      }
+      showError("SPA page load failed. Reloading...");
       setTimeout(() => (location.href = url), 1500);
       return false;
     }
@@ -838,7 +909,6 @@ const SPA = (function () {
       log("SPA disabled by server");
       return;
     }
-
     if (!cfg.enabled) return;
 
     appContainer = document.querySelector(cfg.containerSelector);
@@ -847,9 +917,52 @@ const SPA = (function () {
       return;
     }
 
+    // -------------------------------
+    // titre initial
+    // -------------------------------
+    try {
+      let initialTitle = null;
+
+      if (
+        document._spaTitleRequest &&
+        typeof document._spaTitleRequest === "string"
+      ) {
+        initialTitle = document._spaTitleRequest;
+        delete document._spaTitleRequest;
+      } else {
+        initialTitle =
+          appContainer.getAttribute("data-title") ||
+          appContainer.getAttribute("data-spa-title") ||
+          null;
+      }
+
+      if (initialTitle && initialTitle.trim()) {
+        setSpaTitle(initialTitle.trim());
+        appContainer.setAttribute("data-spa-title", initialTitle.trim());
+      } else {
+        // fallback sûr
+        setSpaTitle("Softadastra");
+        appContainer.setAttribute("data-spa-title", "Softadastra");
+      }
+    } catch (e) {
+      if (cfg.debug) console.debug("[SPA] initial title setup failed", e);
+    }
+
     setUpErrorOverlay();
     initLinkHandlers();
     updateActiveLinks();
+
+    document.addEventListener("spa:requested-setTitle", (ev) => {
+      try {
+        const t = ev?.detail?.title;
+        if (t) {
+          setSpaTitle(t);
+          appContainer.setAttribute("data-spa-title", String(t));
+        }
+      } catch (e) {
+        if (cfg.debug) console.debug("[SPA] event setTitle handler failed", e);
+      }
+    });
 
     window.addEventListener("popstate", () => {
       const url = normalizeUrl(location.href);
@@ -868,6 +981,7 @@ const SPA = (function () {
     prefetch: (url) => prefetch(normalizeUrl(url)),
     clearCache,
     setTransition: (name) => (cfg.transition = name),
+    setTitle: (t) => setSpaTitle(t),
     config: () => ({ ...cfg }),
     cacheGet,
     cacheSet,
