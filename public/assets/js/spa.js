@@ -746,6 +746,78 @@ const SPA = (function () {
     }
   };
 
+  // --- begin patch: copy meta + signal page init after fragment injection ---
+  /**
+   * Copy important <meta> tags (csrf, etc.) from fetched doc into current head
+   * so server-side checks that rely on meta (csrf-token) keep working.
+   */
+  const copyHeadMeta = (doc) => {
+    try {
+      if (!doc || !doc.head) return;
+      const metaNames = ["csrf-token", "csrf-token-name", "csrf-param"]; // ajoute ce dont ton backend a besoin
+      for (const name of metaNames) {
+        const m = doc.head.querySelector(`meta[name="${name}"]`);
+        if (m) {
+          // replace or add in current head
+          let exist = document.head.querySelector(`meta[name="${name}"]`);
+          if (exist) {
+            exist.setAttribute("content", m.getAttribute("content") || "");
+          } else {
+            const nm = document.createElement("meta");
+            nm.name = name;
+            nm.content = m.getAttribute("content") || "";
+            document.head.appendChild(nm);
+          }
+        }
+      }
+    } catch (e) {
+      if (cfg.debug) console.debug("copyHeadMeta failed", e);
+    }
+  };
+
+  /**
+   * Dispatch a custom event to let page scripts re-bind handlers.
+   * Also attempt to call common global init if present.
+   */
+  const notifyFragmentLoaded = (url) => {
+    try {
+      document.dispatchEvent(
+        new CustomEvent("spa:fragment:loaded", {
+          detail: { url: String(url) },
+        })
+      );
+
+      // If page defines a global init function, call it.
+      if (window.pageInit && typeof window.pageInit === "function") {
+        try {
+          window.pageInit();
+        } catch (e) {
+          if (cfg.debug) console.debug("pageInit failed", e);
+        }
+      }
+
+      // compatibility: older pages might listen for 'render' event
+      document.dispatchEvent(
+        new CustomEvent("spa:render", { detail: { url: String(url) } })
+      );
+    } catch (e) {
+      if (cfg.debug) console.debug("notifyFragmentLoaded failed", e);
+    }
+  };
+
+  function updateCsrfToken() {
+    const tokenMeta = document.querySelector('meta[name="csrf-token"]');
+    if (!tokenMeta) return;
+
+    const token = tokenMeta.getAttribute("content");
+    if (!token) return;
+
+    // mettre à jour tous les champs CSRF dans les formulaires SPA
+    document.querySelectorAll('input[name="csrf_token"]').forEach((input) => {
+      input.value = token;
+    });
+  }
+
   // ---------------------------
   // loadPage final (avec cleanup page-scoped + robustifications)
   // ---------------------------
@@ -785,6 +857,7 @@ const SPA = (function () {
           const metaName =
             d.querySelector('meta[name="title"]')?.getAttribute("content") ||
             null;
+
           return { docTitle, og, metaName };
         } catch (e) {
           return { docTitle: null, og: null, metaName: null };
@@ -817,6 +890,9 @@ const SPA = (function () {
       preserveFormState(appContainer, newFragment);
       appContainer.innerHTML = newFragment.innerHTML;
 
+      // --- NOUVEAU --- mettre à jour CSRF après injection
+      updateCsrfToken();
+
       // 10) mettre à jour data-spa-title après injection
       try {
         if (headerTitle?.trim()) {
@@ -841,6 +917,12 @@ const SPA = (function () {
 
       // 11) exécuter scripts fragment
       runPageScripts(appContainer);
+
+      // copier meta importants (CSRF...)
+      copyHeadMeta(doc);
+
+      // dispatch event + appeler init global si présent
+      notifyFragmentLoaded(url);
 
       // 12) syntax highlighting
       if (window.__runHljs) window.__runHljs();
