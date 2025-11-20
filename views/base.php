@@ -10,7 +10,7 @@
 
     <!-- Favicon -->
     <link rel="icon" href="<?= $favicon ?? asset('assets/favicon/favicon.png') ?>">
-
+    <meta name="csrf-token" content="<?= htmlspecialchars($__csrf_token) ?>">
     <!-- Bootstrap CSS -->
     <link
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
@@ -20,6 +20,8 @@
 
     <!-- Global CSS -->
     <link rel="stylesheet" href="<?= asset('assets/css/app.css') ?>">
+    <link rel="stylesheet" href="<?= asset('assets/css/modal.css') ?>">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
     <!-- Page-level CSS -->
     <?= $styles ?? '' ?>
@@ -32,6 +34,7 @@
             document.documentElement.classList.add('dark');
         }
     </script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 </head>
 
 <body class="bg-light text-dark font-sans">
@@ -58,6 +61,7 @@
     <!-- Global JS -->
     <script src="<?= asset('assets/js/spa.js') ?>" defer></script>
     <script src="<?= asset('assets/js/app.js') ?>" defer></script>
+    <script src="<?= asset('assets/js/modal.js') ?>" defer></script>
 
     <!-- SPA toggle -->
     <script>
