@@ -68,4 +68,38 @@ class GoogleService
     {
         return $this->client->createAuthUrl();
     }
+
+    /**
+     * Fetch Google user profile using OAuth code.
+     *
+     * @param string $code The authorization code returned by Google.
+     * @return object|null Returns an object with email, name, picture, verifiedEmail or null on failure.
+     */
+    public function fetchUser(string $code): ?object
+    {
+        try {
+            // Échanger le code contre un token
+            $token = $this->client->fetchAccessTokenWithAuthCode($code);
+
+            if (isset($token['error'])) {
+                throw new \RuntimeException('Google token error: ' . $token['error']);
+            }
+
+            $this->client->setAccessToken($token);
+
+            // Obtenir le profil utilisateur
+            $oauth2 = new \Google\Service\Oauth2($this->client);
+            $userInfo = $oauth2->userinfo->get();
+
+            return (object)[
+                'email' => $userInfo->email ?? null,
+                'name'  => $userInfo->name ?? null,
+                'picture' => $userInfo->picture ?? null,
+                'verifiedEmail' => $userInfo->verifiedEmail ?? false,
+            ];
+        } catch (\Throwable $e) {
+            error_log('[GoogleService] fetchUser failed: ' . $e->getMessage());
+            return null;
+        }
+    }
 }
