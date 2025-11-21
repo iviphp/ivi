@@ -32,6 +32,24 @@ final class Request
         $this->rawBody = $rawBody;
     }
 
+    public function get(string $key, mixed $default = null): mixed
+    {
+        if (array_key_exists($key, $this->query)) {
+            return $this->query[$key];
+        }
+
+        if (array_key_exists($key, $this->post)) {
+            return $this->post[$key];
+        }
+
+        $json = $this->json();
+        if (array_key_exists($key, $json)) {
+            return $json[$key];
+        }
+
+        return $default;
+    }
+
     // Factory: crée depuis superglobales PHP
     public static function fromGlobals(): self
     {
