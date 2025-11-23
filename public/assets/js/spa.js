@@ -818,9 +818,35 @@ const SPA = (function () {
     });
   }
 
-  // ---------------------------
-  // loadPage final (avec cleanup page-scoped + robustifications)
-  // ---------------------------
+  // -----------------------------------------------------
+  // Auto-init d'une page selon l'URL, ex : /user/home → pageUserHome.init()
+  function callPageInitFromUrl(url) {
+    const clean = url.replace(/\?.*$/, "").replace(/^\/+|\/+$/g, "");
+    if (!clean) return;
+
+    const parts = clean.split("/");
+    const name =
+      "page" +
+      parts.map((x) => x.charAt(0).toUpperCase() + x.slice(1)).join("");
+
+    let attempts = 0;
+    const tryInit = () => {
+      if (window[name]?.init) {
+        window[name].init();
+        console.log("[SPA] Auto init →", name);
+      } else if (attempts++ < 20) {
+        setTimeout(tryInit, 50); // retry toutes les 50ms max 1s
+      } else {
+        console.warn(`[SPA] Page init not found for ${name}`);
+      }
+    };
+
+    tryInit();
+  }
+
+  // -----------------------------------------------------
+  // loadPage final
+  // -----------------------------------------------------
   const loadPage = async (url, push = true) => {
     if (!appContainer) return (location.href = url);
 
@@ -828,6 +854,7 @@ const SPA = (function () {
       // 1) récupérer HTML + headerTitle
       let html,
         headerTitle = null;
+
       const cached = cacheGet(url);
       if (cached) {
         html = cached;
@@ -840,13 +867,13 @@ const SPA = (function () {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, "text/html");
 
-      // 2) synchroniser <html> et <body> (classes/attrs)
+      // 2) synchroniser <html> + <body>
       syncHtmlAndBodyAttrs(doc);
 
-      // 3) exécuter scripts head si configuré
+      // 3) exécuter scripts head si activé
       if (cfg.execHeadScripts) runHeadScripts(doc);
 
-      // 4) helper pour extraire les titres
+      // 4) Helper titre
       const pickTitleFromDoc = (d) => {
         try {
           const docTitle = d.title?.trim() || null;
@@ -864,7 +891,7 @@ const SPA = (function () {
         }
       };
 
-      // 5) première passe titre : priorité headerTitle > doc.title > meta
+      // 5) Première passe titre
       if (headerTitle?.trim()) {
         setSpaTitle(headerTitle.trim());
       } else {
@@ -874,10 +901,10 @@ const SPA = (function () {
         else if (cand.metaName) setSpaTitle(cand.metaName);
       }
 
-      // 6) sélectionner fragment principal
+      // 6) sélectionner fragment
       const newFragment = doc.querySelector(cfg.containerSelector) || doc.body;
 
-      // 7) masquer container pour éviter flash
+      // 7) masquer pour éviter flash
       const prevVisibility = appContainer.style.visibility;
       const prevOpacity = appContainer.style.opacity;
       appContainer.style.visibility = "hidden";
@@ -886,14 +913,14 @@ const SPA = (function () {
       // 8) appliquer styles async
       await runPageStylesAsync(doc);
 
-      // 9) préserver états forms et injecter le fragment
+      // 9) préserver états form + injection
       preserveFormState(appContainer, newFragment);
       appContainer.innerHTML = newFragment.innerHTML;
 
-      // --- NOUVEAU --- mettre à jour CSRF après injection
+      // mise à jour CSRF
       updateCsrfToken();
 
-      // 10) mettre à jour data-spa-title après injection
+      // 10) mise à jour data-spa-title
       try {
         if (headerTitle?.trim()) {
           appContainer.setAttribute("data-spa-title", headerTitle.trim());
@@ -918,26 +945,35 @@ const SPA = (function () {
       // 11) exécuter scripts fragment
       runPageScripts(appContainer);
 
-      // copier meta importants (CSRF...)
+      document.dispatchEvent(
+        new CustomEvent("spa:page-ready", { detail: { url } })
+      );
+
+      // -----------------------------------------------------
+      // 11.1) AUTO INIT DE LA PAGE ACTUELLE
+      // -----------------------------------------------------
+      callPageInitFromUrl(url);
+
+      // copier meta (CSRF...)
       copyHeadMeta(doc);
 
-      // dispatch event + appeler init global si présent
+      // dispatch event
       notifyFragmentLoaded(url);
 
       // 12) syntax highlighting
       if (window.__runHljs) window.__runHljs();
 
-      // 13) ré-init handlers
+      // 13) ré-init des handlers
       initLinkHandlers();
 
-      // 14) restaurer visibilité + transition
+      // 14) transition
       setTimeout(() => {
         appContainer.style.visibility = prevVisibility || "";
         appContainer.style.opacity = prevOpacity || "";
         applyTransitionIn(appContainer);
       }, 10);
 
-      // 15) navigation history et active links
+      // 15) history + active links
       if (push) {
         history.pushState(null, "", url);
         updateActiveLinks(url);
@@ -948,7 +984,7 @@ const SPA = (function () {
       // 16) scroll top
       scrollTo(0, 0);
 
-      // 17) second-pass title update après petit délai
+      // 17) second pass titre
       setTimeout(() => {
         try {
           const fragAttrNow =
@@ -959,8 +995,9 @@ const SPA = (function () {
               ?.getAttribute("data-title") ||
             null;
 
-          if (fragAttrNow?.trim()) setSpaTitle(fragAttrNow.trim());
-          else {
+          if (fragAttrNow?.trim()) {
+            setSpaTitle(fragAttrNow.trim());
+          } else {
             const cand2 = pickTitleFromDoc(doc);
             if (cand2.docTitle) setSpaTitle(cand2.docTitle);
             else if (cand2.og) setSpaTitle(cand2.og);
