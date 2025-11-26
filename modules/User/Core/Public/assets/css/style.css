@@ -1,0 +1,109 @@
+/* CSS for User module */
+body {
+  font-family: sans-serif;
+  background-color: #f0f4f8;
+  color: #333;
+}
+#welcome-title {
+  color: #008037;
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+p {
+  font-size: 1rem;
+}
+
+/* ===== Global Container ===== */
+.user-home-container {
+  max-width: 900px;
+  margin: 50px auto;
+  padding: 20px;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+}
+
+/* ===== Header ===== */
+.user-home-container header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.user-home-container header h1 {
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+/* ===== User Info Section ===== */
+.user-info {
+  margin-bottom: 40px;
+}
+
+.user-info h2 {
+  font-size: 1.5rem;
+  margin-bottom: 20px;
+  color: #34495e;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 5px;
+}
+
+#user-info-content {
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  padding: 20px;
+  transition: all 0.3s ease;
+}
+
+#user-info-content p {
+  margin: 0;
+  color: #555;
+}
+
+/* Hover effect for card */
+#user-info-content:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* ===== Actions Section ===== */
+.user-actions {
+  text-align: center;
+}
+
+.btn-logout {
+  background-color: #e74c3c;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 12px 30px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-logout:hover {
+  background-color: #c0392b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 600px) {
+  .user-home-container {
+    padding: 15px;
+  }
+
+  .user-home-container header h1 {
+    font-size: 2rem;
+  }
+
+  .user-info h2 {
+    font-size: 1.2rem;
+  }
+
+  .btn-logout {
+    width: 100%;
+    padding: 12px;
+  }
+}

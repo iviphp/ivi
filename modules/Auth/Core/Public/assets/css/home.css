@@ -1,0 +1,197 @@
+/* === Reset & Base === */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", sans-serif;
+}
+
+body {
+  background-color: #f9fafb;
+  color: #1c1c1c;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* === Shell & Container === */
+.xa-shell {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 1rem;
+  min-height: 100vh;
+}
+
+.xa-container.is-single {
+  width: 100%;
+  max-width: 420px;
+}
+
+/* === Card === */
+.xa-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.xa-card-head {
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.xa-link {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+  text-decoration: none;
+  color: #3b82f6;
+  transition: color 0.2s;
+}
+
+.xa-link:hover {
+  color: #2563eb;
+}
+
+/* === Card Body === */
+.xa-card-body {
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.xa-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.xa-desc {
+  font-size: 0.95rem;
+  color: #6b7280;
+  margin-bottom: 1.5rem;
+}
+
+/* === Buttons === */
+.xa-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.xa-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  border-radius: 24px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.xa-btn svg {
+  flex-shrink: 0;
+}
+
+/* Google */
+.xa-btn--google {
+  background-color: #fff;
+  color: #3c4043;
+  border: 1px solid #d1d5db;
+}
+.xa-btn--google:hover {
+  background-color: #f7f7f7;
+  box-shadow: 0 3px 6px rgba(60, 64, 67, 0.15);
+}
+
+/* Email */
+.xa-btn--email {
+  background-color: #f3f4f6;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
+}
+.xa-btn--email:hover {
+  background-color: #e5e7eb;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Primary / Create Account - Softadastra */
+.xa-btn--primary {
+  background-color: #ff9900;
+  color: #ffffff;
+  font-weight: 600;
+}
+.xa-btn--primary:hover {
+  background-color: #e68a00;
+  box-shadow: 0 4px 8px rgba(255, 153, 0, 0.4);
+}
+
+/* Divider */
+.xa-divider {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 1rem 0;
+  position: relative;
+}
+.xa-divider::before,
+.xa-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 40%;
+  height: 1px;
+  background: #d1d5db;
+}
+.xa-divider::before {
+  left: 0;
+}
+.xa-divider::after {
+  right: 0;
+}
+
+/* === Legal / Footer === */
+.xa-legal {
+  padding: 1rem 1.5rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+  text-align: center;
+  border-top: 1px solid #e5e7eb;
+}
+
+.xa-legal a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+.xa-legal a:hover {
+  color: #2563eb;
+}
+
+/* === Responsive === */
+@media (max-width: 480px) {
+  .xa-card {
+    border-radius: 10px;
+  }
+  .xa-card-body {
+    padding: 1.5rem;
+  }
+  .xa-btn {
+    font-size: 0.9rem;
+    padding: 0.6rem 0.8rem;
+  }
+}

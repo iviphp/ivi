@@ -146,6 +146,12 @@ abstract class Controller
             $response = new HtmlResponse($content, $status);
             $response->header('X-Page-Title', $pageTitle);
 
+            // 🔥 Ajout scripts SPA
+            if (!empty($params['spa_scripts'])) {
+                // spa_scripts = liste d’URL, pas de balises <script>
+                $response->header('X-Page-Scripts', json_encode($params['spa_scripts']));
+            }
+
             return $response;
         }
 

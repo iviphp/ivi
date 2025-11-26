@@ -1,0 +1,644 @@
+.custom-button-login {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 120px;
+}
+
+.btn-spinner {
+  width: 1rem;
+  height: 1rem;
+}
+
+.terms-acceptance {
+  font-size: 0.9rem;
+  color: #333;
+  margin-top: 10px;
+  font-weight: 500;
+}
+
+.terms-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.4;
+}
+
+.terms-checkbox {
+  margin-top: 2px;
+  margin-right: 10px;
+  transform: scale(1.2);
+  accent-color: #ff9900;
+  cursor: pointer;
+}
+
+.terms-acceptance a {
+  color: #007bff;
+  text-decoration: underline;
+}
+
+.terms-acceptance a:hover {
+  color: #0056b3;
+}
+
+.custom-button-login {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 120px;
+}
+
+.btn-spinner {
+  width: 1rem;
+  height: 1rem;
+}
+
+.popup-message {
+  position: fixed;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 15px;
+  border: 1px solid;
+  border-radius: 5px;
+  width: 300px;
+  z-index: 9999;
+  display: none;
+}
+
+.success-popup {
+  background-color: #d4edda;
+  color: #155724;
+  border-color: #c3e6cb;
+}
+
+.error-popup {
+  background-color: #f8d7da;
+  color: #721c24;
+  border-color: #f5c6cb;
+}
+
+.close-popup {
+  font-size: 20px;
+  color: inherit;
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  cursor: pointer;
+}
+
+.close-popup:hover {
+  color: #5c0a0a;
+}
+
+.password-container {
+  position: relative;
+}
+
+#togglePassword {
+  font-size: 20px;
+  color: #ff9900;
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+#togglePassword:hover {
+  color: #0056b3;
+}
+
+#togglePassword.fa-eye-slash {
+  color: #dc3545;
+}
+
+.form-control {
+  padding-right: 40px;
+}
+
+body {
+  margin: 30px 0px 0px 0px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f2f2f2;
+  font-family: Arial, sans-serif;
+}
+
+/* Page de login */
+.login-page {
+  max-width: 500px;
+  width: 100%;
+  margin: 0 auto;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 0.1rem;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+  margin-top: 10px;
+  margin-bottom: 30px;
+}
+
+.login-page .form-group {
+  margin-bottom: 20px;
+}
+
+.login-page .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.login-page .form-group .form-control {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #333;
+  background-color: #fff;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.login-page .form-group .form-control:hover {
+  border-color: #ff9900;
+}
+
+.login-page .form-group .form-control:focus {
+  border-color: #ff9900;
+  box-shadow: 0 0 8px rgba(255, 153, 0, 0.4);
+  outline: none;
+}
+
+.login-page .form-group input:invalid {
+  border-color: #f8d7da;
+}
+
+.login-page .form-group input[type="password"] {
+  font-family: "Arial", sans-serif;
+}
+
+.login-page .logo {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.login-page .logo img {
+  width: 10vw;
+  max-width: 95px;
+  height: auto;
+  border-radius: 50%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+  border: 1px solid #ff9900;
+}
+
+.login-page .logo img:hover {
+  transform: scale(1.1);
+}
+
+.card-title {
+  font-size: 1.3rem;
+  color: #0f1111;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.card-container-login {
+  max-width: 450px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1rem;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.card-container-login p {
+  margin-bottom: 10px;
+}
+
+.custom-button-container-login {
+  width: 100%;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.custom-button-login {
+  width: 100%;
+  max-width: 450px;
+  padding: 12px 25px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border: 1px solid #ff9900;
+  border-radius: 30px;
+  background-color: #ff9900;
+  color: white;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.custom-button-login:hover {
+  background-color: #e68900;
+  border-color: #e68900;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+.custom-button-login:active {
+  background-color: #cc7a00;
+  border-color: #cc7a00;
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-container-create {
+  width: 100%;
+  text-align: center;
+  padding: 0px 20px 30px;
+}
+
+.card-container-create p {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #0f1111;
+  margin-bottom: 20px;
+}
+
+.custom-button-create {
+  width: 100%;
+  max-width: 420px;
+  padding: 12px 25px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border: 1px solid #0f1111;
+  border-radius: 30px;
+  background-color: transparent;
+  color: #0f1111;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.custom-button-create:hover {
+  background-color: transparent;
+  border-color: #009944;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+.custom-button-create:active {
+  background-color: transparent;
+  border-color: #008837;
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+@media only screen and (max-width: 600px) {
+  .login-page {
+    max-width: 400px;
+    margin-bottom: 10px;
+  }
+
+  .login-page .logo img {
+    max-width: 80px;
+    /* Réduit la taille de l'image sur les petits écrans */
+  }
+
+  .custom-button-login {
+    font-size: 1rem;
+    /* Taille de police réduite sur les petits écrans */
+    padding: 10px 20px;
+    /* Moins de padding pour les petits écrans */
+  }
+
+  .custom-button-create {
+    font-size: 1rem;
+    padding: 10px 20px;
+  }
+
+  .card-title {
+    font-size: 1.1rem;
+    /* Réduire légèrement la taille de la police */
+  }
+}
+
+.error-message {
+  color: #d9534f;
+  font-size: 16px;
+  padding: 15px;
+  border: 1px solid #d9534f;
+  border-radius: 4px;
+  background-color: #f8d7da;
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  position: relative;
+}
+
+.error-message i {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.error-message p {
+  margin: 0;
+}
+
+.error-message a {
+  color: #007185;
+  text-decoration: underline;
+  font-weight: bold;
+  margin-top: 10px;
+  display: block;
+}
+
+/* Icône de chargement */
+.spinner {
+  border: 8px solid #f3f3f3;
+  /* Couleur de fond grise claire */
+  border-top: 8px solid #ff9900;
+  /* Couleur de la barre en haut pour un effet dynamique */
+  border-radius: 50%;
+  /* Forme ronde */
+  width: 50px;
+  /* Largeur du spinner */
+  height: 50px;
+  /* Hauteur du spinner */
+  animation: spin 1.5s linear infinite;
+  /* Animation de rotation */
+  margin: 0 auto;
+  /* Centrer le spinner */
+}
+
+/* Animation de rotation */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Popup de notification */
+.popup-message {
+  position: fixed;
+  /* Fixer la popup à l'écran */
+  top: 50%;
+  /* Centrer verticalement */
+  left: 50%;
+  /* Centrer horizontalement */
+  transform: translate(-50%, -50%);
+  /* Ajuster pour centrer parfaitement */
+  background-color: #fff;
+  /* Fond blanc pour la popup */
+  border: 1px solid #ff9900;
+  /* Bordure orange */
+  padding: 20px;
+  /* Espacement interne */
+  border-radius: 10px;
+  /* Coins arrondis */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  /* Ombre légère */
+  width: 300px;
+  /* Largeur fixe de la popup */
+  text-align: center;
+  /* Centrer le texte */
+  display: none;
+  /* Cacher par défaut */
+  z-index: 9999;
+  /* Assurer que la popup est au-dessus des autres éléments */
+}
+
+/* Texte de la popup */
+.popup-message p {
+  font-size: 1rem;
+  color: #333;
+  /* Texte sombre */
+  margin: 0;
+}
+
+/* Effet de popup (apparition douce) */
+.popup-message.show {
+  animation: popupFadeIn 0.5s ease-out forwards;
+  /* Animation d'apparition */
+}
+
+/* Animation d'apparition de la popup */
+@keyframes popupFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+    /* Départ légèrement plus haut */
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    /* Position finale */
+  }
+}
+
+/* Style d'un bouton ou texte de fermeture dans la popup */
+.popup-message .close-btn {
+  margin-top: 10px;
+  padding: 8px 15px;
+  background-color: #ff9900;
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.popup-message .close-btn:hover {
+  background-color: #e68900;
+}
+
+/* Responsivité pour les petits écrans */
+@media only screen and (max-width: 600px) {
+  .spinner {
+    width: 40px;
+    height: 40px;
+  }
+
+  .popup-message {
+    width: 250px;
+    /* Réduire la taille de la popup sur les petits écrans */
+  }
+}
+
+/* ===== Phone Input (flag + dropdown) ===== */
+.phone-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--xa-line, #e7e9ee);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.phone-input-wrapper:focus-within {
+  border-color: var(--xa-brand, #ff9900);
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.15);
+  background: #fffdfa;
+}
+
+.flag-icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+  border: 1px solid var(--xa-line, #e7e9ee);
+  background: #fff;
+  user-select: none;
+}
+
+#phone_number {
+  flex: 1 1 auto;
+  border: 0;
+  outline: 0;
+  font-size: 15px;
+  color: var(--xa-text, #0b0c0f);
+  min-width: 0;
+  background: transparent;
+}
+
+#phone_number::placeholder {
+  color: var(--xa-muted, #667085);
+  opacity: 0.9;
+}
+
+/* Error state */
+.input-error,
+#phone_number.input-error {
+  border-color: #ef4444 !important;
+  /* red-500 */
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.error-messages {
+  margin-top: 6px;
+  color: #b91c1c;
+  /* red-700 */
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+/* ===== Country Dropdown ===== */
+.country-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: 100%;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--xa-line, #e7e9ee);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(16, 24, 40, 0.12);
+  display: none;
+  /* toggled by JS */
+}
+
+.country-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--xa-text, #0b0c0f);
+  transition: background 0.15s ease;
+}
+
+.country-option:hover {
+  background: #fff7ea;
+  /* léger warm */
+}
+
+.country-option:active {
+  background: #ffe6c2;
+}
+
+/* Scroll styling (optionnel) */
+.country-dropdown::-webkit-scrollbar {
+  width: 10px;
+}
+
+.country-dropdown::-webkit-scrollbar-thumb {
+  background: #e9edf3;
+  border-radius: 999px;
+  border: 2px solid #fff;
+}
+
+/* ===== Label + group spacing ===== */
+#phone-wrapper label[for="phone_number"] {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--xa-text, #0b0c0f);
+}
+
+/* ===== Small screens ===== */
+@media (max-width: 420px) {
+  .phone-input-wrapper {
+    padding: 9px 10px;
+    border-radius: 10px;
+  }
+
+  .flag-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 16px;
+    border-radius: 7px;
+  }
+
+  #phone_number {
+    font-size: 14.5px;
+  }
+
+  .country-option {
+    padding: 9px 10px;
+    font-size: 13.5px;
+  }
+}
+
+/* ===== Dark-on-light fallback (si pas de variables) ===== */
+:root {
+  --xa-line: #e7e9ee;
+  --xa-text: #0b0c0f;
+  --xa-muted: #667085;
+  --xa-brand: #ff9900;
+}
+
+/* ===== Optional: helper class for showing dropdown ===== */
+.country-dropdown.is-open {
+  display: block;
+}

@@ -1,0 +1,761 @@
+/* Card principale */
+.sa-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 400px;
+  margin: 40px auto;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  position: relative;
+}
+
+/* Header */
+.sa-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.sa-back {
+  color: #666;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.sa-back i {
+  margin-right: 6px;
+}
+
+.sa-logo img {
+  height: 40px;
+}
+
+/* Titre */
+.sa-title {
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #222;
+}
+
+/* Formulaire */
+.sa-field {
+  margin-bottom: 16px;
+}
+
+.sa-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  display: block;
+  margin-bottom: 6px;
+  color: #444;
+}
+
+.sa-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.sa-input:focus {
+  border-color: #ff9900;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.2);
+}
+
+/* Password avec icône */
+.sa-password {
+  position: relative;
+}
+
+.sa-password__toggle {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  color: #888;
+}
+
+/* Boutons */
+.sa-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  width: 100%;
+  transition: background 0.2s;
+}
+
+.sa-btn--primary {
+  background: #ff9900;
+  color: #fff;
+}
+
+.sa-btn--primary:hover {
+  background: #e68a00;
+}
+
+.sa-btn--secondary {
+  background: #f1f1f1;
+  color: #333;
+}
+
+.sa-btn--google {
+  margin-top: 12px;
+  background: #fff;
+  border: 1px solid #ddd;
+  color: #444;
+}
+
+.sa-btn--google:hover {
+  background: #f8f8f8;
+}
+
+/* Divider "or" */
+.sa-divider {
+  text-align: center;
+  margin: 18px 0;
+  position: relative;
+}
+
+.sa-divider span {
+  background: #fff;
+  padding: 0 10px;
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.sa-divider::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #ddd;
+}
+
+/* Liens */
+.sa-link {
+  text-align: center;
+  display: block;
+  font-size: 0.85rem;
+  color: #007bff;
+  margin-top: 14px;
+}
+
+.sa-link:hover {
+  text-decoration: underline;
+}
+
+/* Footer */
+.sa-footer {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+/* Flash messages */
+.sa-flash {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px 18px;
+  border-radius: 10px;
+  color: #fff;
+  display: none;
+  z-index: 999;
+}
+
+.sa-flash--success {
+  background: #28a745;
+}
+
+.sa-flash--error {
+  background: #dc3545;
+}
+
+/* spinner hidden by default */
+#custom-login-login .btn-spinner {
+  display: none;
+  /* fallback */
+  visibility: hidden;
+  /* extra safety */
+  margin-left: 8px;
+}
+
+/* prevent layout shift: reserve space next to text if you want */
+#custom-login-login .btn-text {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* loading state */
+#custom-login-login.is-loading {
+  position: relative;
+  pointer-events: none;
+}
+
+/* when loading: show spinner, optionally dim/hide text */
+#custom-login-login.is-loading .btn-spinner {
+  display: inline-block;
+  visibility: visible;
+}
+
+#custom-login-login.is-loading .btn-text {
+  opacity: 0;
+  /* or keep at 1.0 if you want both */
+}
+
+/* optional: place spinner absolutely to the right (no text jump) */
+#custom-login-login .btn-spinner {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 0;
+  /* not needed when absolutely positioned */
+}
+
+#custom-login-login .btn-spinner {
+  display: none;
+  visibility: hidden;
+}
+
+#custom-login-login.is-loading {
+  position: relative;
+  pointer-events: none;
+}
+
+#custom-login-login.is-loading .btn-spinner {
+  display: inline-block;
+  visibility: visible;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+#custom-login-login.is-loading .btn-text {
+  opacity: 0;
+}
+
+/* ou 1 si tu veux garder le texte visible */
+.sa-logo {
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.sa-logo img {
+  border-radius: 50%;
+  /* logo arrondi */
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .sa-card {
+    padding: 16px;
+    margin: 20px;
+  }
+
+  .sa-title {
+    font-size: 1.2rem;
+  }
+
+  .sa-input {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+
+  .sa-btn {
+    padding: 10px;
+    font-size: 0.9rem;
+  }
+}
+
+#app {
+  padding-top: 100px !important;
+}
+
+@media (max-width: 480px) {
+  #app {
+    padding-top: 150px !important;
+  }
+}
+
+/* ==================================================
+   Softadastra — Popups & Flash (light theme)
+   Couvre: #popupMessage.sa-popup, .sa-flash --success/--error
+================================================== */
+
+/* ---- Tokens ---- */
+:root {
+  --sa-brand: #ff9900;
+  --sa-ink: #111827;
+  --sa-text: #374151;
+  --sa-muted: #6b7280;
+  --sa-border: #e5e7eb;
+  --sa-surface: #ffffff;
+  --sa-soft: #f9fafb;
+  --sa-success: #12b76a;
+  --sa-error: #ef4444;
+  --sa-shadow: 0 18px 50px rgba(0, 0, 0, 0.08);
+  --sa-radius: 14px;
+}
+
+/* Force mode clair */
+html {
+  color-scheme: light;
+}
+
+/* ========== Base popup (toast simple) ========== */
+.sa-popup {
+  position: fixed;
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%) translateY(-10px);
+  z-index: 10000;
+  display: none;
+  /* affiché via JS .style.display ou .show() */
+  max-width: min(560px, 92vw);
+  padding: 12px 14px 12px 16px;
+  background: var(--sa-surface);
+  color: var(--sa-ink);
+  border: 1px solid var(--sa-border);
+  border-radius: var(--sa-radius);
+  box-shadow: var(--sa-shadow);
+  line-height: 1.4;
+  animation: sa-pop-slide 0.22s ease forwards;
+}
+
+.sa-popup p {
+  margin: 0;
+  color: var(--sa-text);
+}
+
+.sa-popup__close {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  color: #6b7280;
+  box-shadow: 0 0 0 1px var(--sa-border) inset;
+  cursor: pointer;
+}
+
+.sa-popup__close:hover {
+  background: #f6f7fb;
+}
+
+.sa-popup__close:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sa-brand) 35%, transparent);
+  outline-offset: 2px;
+}
+
+/* ========== Flash modales (success/error) ========== */
+.sa-flash {
+  position: fixed;
+  left: 50%;
+  top: 18px;
+  transform: translateX(-50%) translateY(-10px);
+  z-index: 10001;
+  display: none;
+  /* devient .show via JS */
+  max-width: min(560px, 92vw);
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-border);
+  border-radius: var(--sa-radius);
+  box-shadow: var(--sa-shadow);
+  padding: 12px 14px 12px 16px;
+  color: var(--sa-ink);
+  animation: sa-pop-slide 0.22s ease forwards;
+}
+
+.sa-flash.show {
+  display: block;
+}
+
+.sa-flash .icon {
+  margin-right: 8px;
+  font-size: 20px;
+  vertical-align: -2px;
+}
+
+.sa-flash .message-content {
+  display: inline-block;
+  vertical-align: middle;
+  max-height: 42vh;
+  overflow: auto;
+}
+
+.sa-flash .message-content p {
+  margin: 0;
+  color: var(--sa-text);
+}
+
+.sa-flash--success {
+  border-color: #c7f2d8;
+  box-shadow: 0 18px 50px rgba(18, 183, 106, 0.16);
+}
+
+.sa-flash--success .icon {
+  color: var(--sa-success);
+}
+
+.sa-flash--error {
+  border-color: #fecaca;
+  box-shadow: 0 18px 50px rgba(239, 68, 68, 0.18);
+}
+
+.sa-flash--error .message-content,
+.sa-flash--error .error-list {
+  color: #991b1b;
+}
+
+.error-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.error-list li {
+  margin: 4px 0;
+}
+
+/* ========== Animations ========== */
+@keyframes sa-pop-slide {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* ========== Mobile niceties ========== */
+@media (max-width: 480px) {
+  .sa-popup,
+  .sa-flash {
+    left: 50%;
+    right: auto;
+    top: 12px;
+    transform: translateX(-50%);
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  .sa-popup__close {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+/* === FLASH TOAST — reset "plein écran" === */
+
+/* 0) Par défaut caché ; visible seulement avec .show (ton JS ajoute .show) */
+.sa-flash {
+  display: none;
+}
+
+.sa-flash.show {
+  display: flex;
+}
+
+/* 1) Annule tout plein-écran (inset:0, stretch, etc.) */
+.sa-flash {
+  position: fixed !important;
+  inset: auto !important;
+  /* ← supprime top:0/bottom:0 hérités */
+  top: 16px !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translateX(-50%) !important;
+
+  /* Gabarit toast */
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 52px 12px 16px;
+  /* place pour le bouton close */
+  width: auto;
+  max-width: min(560px, 92vw);
+  height: auto !important;
+  max-height: none !important;
+  border-radius: 12px;
+  z-index: 10000;
+  box-sizing: border-box;
+}
+
+/* 2) Contenu élastique (prend bien 100%) */
+.sa-flash .message-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* vital pour éviter l’overflow */
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* 3) Bouton close ne chevauche pas le texte */
+.sa-flash .sa-popup__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+/* 4) Listes d’erreurs en pleine largeur */
+.sa-flash .error-list {
+  margin: 0;
+  padding-left: 18px;
+  max-width: 100%;
+}
+
+/* 5) Mobile: pleine largeur “inset” horizontale sans s’étirer verticalement */
+@media (max-width: 420px) {
+  .sa-flash {
+    left: 8px !important;
+    right: 8px !important;
+    transform: none !important;
+    top: 12px !important;
+    padding: 12px 48px 12px 12px;
+  }
+}
+
+/* Popup simple (vert/rouge) en mode toast, pas plein écran */
+#popupMessage.sa-popup {
+  position: fixed !important;
+  inset: auto !important;
+  top: 64px !important;
+  /* sous la flash si les deux existent */
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  right: auto !important;
+  bottom: auto !important;
+
+  display: none;
+  padding: 10px 46px 10px 12px;
+  max-width: min(520px, 92vw);
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.12);
+  z-index: 10001;
+}
+
+#popupMessage.sa-popup.show {
+  display: block;
+}
+
+#popupMessage .sa-popup__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+/* ===========================================
+   Softadastra — Auth (Sign in)
+   Light theme, responsive, a11y
+=========================================== */
+
+/* ---------- Tokens ---------- */
+:root {
+  --sa-brand: #ff9900;
+  --sa-brand-600: #ff8a00;
+  --sa-ink: #111827;
+  --sa-text: #374151;
+  --sa-muted: #6b7280;
+  --sa-border: #e5e7eb;
+  --sa-surface: #ffffff;
+  --sa-soft: #f9fafb;
+  --sa-danger: #ef4444;
+  --sa-success: #12b76a;
+  --sa-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  --sa-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.06);
+  --sa-radius: 16px;
+}
+
+/* ---------- Actions ---------- */
+.sa-actions {
+  margin-top: 4px;
+}
+.sa-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.06s ease, box-shadow 0.2s ease, background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.sa-btn--primary {
+  background: var(--sa-brand);
+  color: #1b1100;
+  border-color: var(--sa-brand);
+  box-shadow: var(--sa-shadow-sm);
+}
+.sa-btn--primary:hover {
+  background: var(--sa-brand-600);
+  transform: translateY(-1px);
+}
+.sa-btn--primary:active {
+  transform: translateY(0);
+}
+
+.sa-btn--secondary {
+  background: #fff;
+  color: #111827;
+  border-color: var(--sa-border);
+  box-shadow: var(--sa-shadow-sm);
+}
+.sa-btn--secondary:hover {
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+/* Spinner dans le bouton */
+.btn-spinner {
+  display: none;
+  margin-left: 6px;
+}
+.sa-btn.is-loading .btn-text {
+  opacity: 0;
+}
+.sa-btn.is-loading .btn-spinner {
+  display: inline-block;
+}
+
+/* ---------- Links & footer ---------- */
+.sa-link {
+  color: var(--sa-brand);
+  text-decoration: none;
+  font-weight: 800;
+}
+.sa-link:hover {
+  text-decoration: underline;
+}
+
+.sa-forgot {
+  display: inline-block;
+  margin-top: 8px;
+}
+
+.sa-footer {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  color: var(--sa-muted);
+}
+.sa-footer p {
+  margin: 0;
+}
+
+/* ---------- Flash / Popups ---------- */
+.sa-popup,
+.sa-flash {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  background: #fff;
+  color: var(--sa-ink);
+  border: 1px solid var(--sa-border);
+  border-radius: 12px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.08);
+  max-width: min(560px, 92vw);
+  padding: 14px 16px;
+}
+
+.sa-popup {
+  top: 18px;
+}
+.sa-popup__close {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 0;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--sa-border) inset;
+  color: #6b7280;
+  cursor: pointer;
+}
+.sa-popup__close:hover {
+  background: #f6f7fb;
+}
+
+.sa-flash {
+  display: none;
+  top: 18px;
+}
+.sa-flash .icon {
+  color: var(--sa-success);
+  font-size: 20px;
+  margin-right: 8px;
+}
+.sa-flash--success {
+  border-color: #c7f2d8;
+  box-shadow: 0 18px 50px rgba(18, 183, 106, 0.16);
+}
+.sa-flash--error {
+  border-color: #fecaca;
+  box-shadow: 0 18px 50px rgba(239, 68, 68, 0.18);
+}
+.sa-flash--error .message-content,
+.sa-flash--error .error-list {
+  color: #991b1b;
+  margin: 0;
+  padding-left: 18px;
+}
+
+/* ---------- Error states on fields ---------- */
+.sa-input.is-invalid {
+  border-color: #fca5a5;
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+}
+.sa-field .sa-hint {
+  color: #b91c1c;
+  font-size: 0.9rem;
+}
+
+/* ---------- Small screens ---------- */
+@media (max-width: 640px) {
+  .sa-card {
+    border-radius: 14px;
+  }
+  .sa-actions .sa-btn {
+    padding: 12px;
+  }
+  .sa-footer {
+    justify-content: space-between;
+  }
+}

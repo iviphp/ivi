@@ -18,10 +18,10 @@
  */
 
 return [
-    'client_id'     => GOOGLE_CLIENT_ID,
-    'client_secret' => GOOGLE_CLIENT_SECRET,
-    'redirect_uri'  => GOOGLE_REDIRECT_URI,
-
-    // Converts comma-separated scopes from .env into an array
-    'scopes' => array_map('trim', explode(',', GOOGLE_SCOPES)),
+    'client_id'     => GOOGLE_CLIENT_ID ?? '',
+    'client_secret' => GOOGLE_CLIENT_SECRET ?? '',
+    'redirect_uri'  => GOOGLE_REDIRECT_URI ?? '',
+    'scopes'        => GOOGLE_SCOPES
+        ? array_map('trim', explode(',', GOOGLE_SCOPES))
+        : ['email', 'profile'],
 ];

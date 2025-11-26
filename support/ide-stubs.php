@@ -21,10 +21,3 @@ if (!function_exists('migrations')) {
      */
     function migrations() {}
 }
-
-if (!function_exists('container')) {
-    /**
-     * @return \Ivi\Core\Container\Container
-     */
-    function container() {}
-}
