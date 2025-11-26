@@ -1,0 +1,638 @@
+:root {
+  --sa-bg: var(--xa-bg, #f7f9fc);
+  --sa-surface: #fff;
+  --sa-text: var(--xa-text, #0b0c0f);
+  --sa-muted: var(--xa-muted, #667085);
+  --sa-line: var(--xa-line, #e7e9ee);
+  --sa-brand: var(--xa-brand, #ff9900);
+  --sa-brand-700: var(--xa-brand-700, #e58900);
+  --sa-radius: 16px;
+  --sa-shadow: 0 14px 40px rgba(16, 24, 40, 0.1);
+}
+
+body {
+  background: var(--sa-bg);
+}
+
+.sa-auth {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: 24px 12px;
+}
+
+.sa-card {
+  width: min(720px, 95vw);
+  background: var(--sa-surface);
+  border: 1px solid var(--sa-line);
+  border-radius: var(--sa-radius);
+  box-shadow: var(--sa-shadow);
+  overflow: hidden;
+}
+
+.sa-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--sa-line);
+  background: #fff;
+}
+
+.sa-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sa-muted);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.sa-back:hover {
+  text-decoration: underline;
+}
+
+.sa-logo img {
+  height: 40px;
+  width: auto;
+  display: block;
+}
+
+.sa-card__body {
+  padding: 18px 18px 22px;
+}
+
+.sa-title {
+  margin: 0 0 10px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--sa-text);
+}
+
+.sa-form {
+  display: grid;
+  gap: 14px;
+}
+
+.sa-field {
+  display: grid;
+  gap: 8px;
+}
+
+.sa-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sa-text);
+}
+
+.sa-input {
+  width: 100%;
+  border: 1px solid var(--sa-line);
+  border-radius: 12px;
+  padding: 12px 12px;
+  font-size: 15px;
+  color: var(--sa-text);
+  background: #fff;
+  outline: 0;
+  transition: box-shadow 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.sa-input:focus {
+  border-color: var(--sa-brand);
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.15);
+  background: #fffdfa;
+}
+
+.sa-password {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sa-password .sa-input {
+  padding-right: 44px;
+}
+
+.sa-password__toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--sa-muted);
+  border-radius: 8px;
+}
+
+.sa-password__toggle:hover {
+  background: #f6f7f9;
+}
+
+.sa-password__toggle i {
+  pointer-events: none;
+}
+
+.sa-help {
+  color: var(--sa-muted);
+  font-size: 12.5px;
+}
+
+.sa-inline-help {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sa-muted);
+  font-size: 14px;
+}
+
+.sa-inline-help a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.sa-actions {
+  margin-top: 6px;
+}
+
+.sa-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--sa-line);
+  background: #fff;
+  color: var(--sa-text);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.06s, box-shadow 0.2s, background 0.2s,
+    border-color 0.2s;
+  min-width: 180px;
+  position: relative;
+}
+
+.sa-btn .btn-spinner {
+  display: none;
+  margin-left: 6px;
+}
+
+.sa-btn[disabled] {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.sa-btn--primary {
+  background: var(--sa-brand);
+  border-color: var(--sa-brand);
+  color: #1b1100;
+}
+
+.sa-btn--primary:hover {
+  background: var(--sa-brand-700);
+  border-color: var(--sa-brand-700);
+}
+
+.sa-btn--primary:active {
+  transform: translateY(1px);
+}
+
+.sa-popup {
+  display: none;
+  margin-top: 12px;
+  border: 1px solid var(--sa-line);
+  border-left: 4px solid var(--sa-brand);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fffefa;
+  color: var(--sa-text);
+  position: relative;
+}
+
+.sa-popup.success-popup {
+  border-left-color: #22c55e;
+  background: #f1fff5;
+}
+
+.sa-popup.error-popup {
+  border-left-color: #ef4444;
+  background: #fff6f6;
+}
+
+.sa-popup__close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: 0;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: #555;
+}
+
+/* Réutilise tes styles phone-input fournis précédemment */
+.phone-input-wrapper {
+  /* déjà défini dans ton autre CSS */
+}
+
+.flag-icon {
+  /* idem */
+}
+
+.country-dropdown {
+  /* idem */
+}
+
+.country-option {
+  /* idem */
+}
+
+.error-messages {
+  margin-top: 6px;
+  color: #b91c1c;
+  font-size: 12.5px;
+}
+
+/* Mobile tweaks */
+@media (max-width: 480px) {
+  .sa-card__head {
+    padding: 12px 14px;
+  }
+
+  .sa-card__body {
+    padding: 14px;
+  }
+
+  .sa-title {
+    font-size: 20px;
+  }
+
+  .sa-input {
+    padding: 11px 12px;
+    font-size: 14.5px;
+  }
+
+  .sa-btn {
+    width: 100%;
+    min-width: unset;
+    padding: 12px;
+  }
+}
+
+/* ===== Phone Input (flag + dropdown) ===== */
+.phone-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--xa-line, #e7e9ee);
+  border-radius: 12px;
+  background: #fff;
+  padding: 10px 12px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.phone-input-wrapper:focus-within {
+  border-color: var(--xa-brand, #ff9900);
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.15);
+  background: #fffdfa;
+}
+
+.flag-icon {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  line-height: 1;
+  border: 1px solid var(--xa-line, #e7e9ee);
+  background: #fff;
+  user-select: none;
+}
+
+#phone_number {
+  flex: 1 1 auto;
+  border: 0;
+  outline: 0;
+  font-size: 15px;
+  color: var(--xa-text, #0b0c0f);
+  min-width: 0;
+  background: transparent;
+}
+
+#phone_number::placeholder {
+  color: var(--xa-muted, #667085);
+  opacity: 0.9;
+}
+
+/* Error state */
+.input-error,
+#phone_number.input-error {
+  border-color: #ef4444 !important;
+  /* red-500 */
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15) !important;
+}
+
+.error-messages {
+  margin-top: 6px;
+  color: #b91c1c;
+  /* red-700 */
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+/* ===== Country Dropdown ===== */
+.country-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  width: 100%;
+  max-height: 220px;
+  overflow: auto;
+  border: 1px solid var(--xa-line, #e7e9ee);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(16, 24, 40, 0.12);
+  display: none;
+  /* toggled by JS */
+}
+
+.country-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--xa-text, #0b0c0f);
+  transition: background 0.15s ease;
+}
+
+.country-option:hover {
+  background: #fff7ea;
+  /* léger warm */
+}
+
+.country-option:active {
+  background: #ffe6c2;
+}
+
+/* Scroll styling (optionnel) */
+.country-dropdown::-webkit-scrollbar {
+  width: 10px;
+}
+
+.country-dropdown::-webkit-scrollbar-thumb {
+  background: #e9edf3;
+  border-radius: 999px;
+  border: 2px solid #fff;
+}
+
+/* ===== Label + group spacing ===== */
+#phone-wrapper label[for="phone_number"] {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--xa-text, #0b0c0f);
+}
+
+/* ===== Small screens ===== */
+@media (max-width: 420px) {
+  .phone-input-wrapper {
+    padding: 9px 10px;
+    border-radius: 10px;
+  }
+
+  .flag-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 16px;
+    border-radius: 7px;
+  }
+
+  #phone_number {
+    font-size: 14.5px;
+  }
+
+  .country-option {
+    padding: 9px 10px;
+    font-size: 13.5px;
+  }
+}
+
+/* ===== Dark-on-light fallback (si pas de variables) ===== */
+:root {
+  --xa-line: #e7e9ee;
+  --xa-text: #0b0c0f;
+  --xa-muted: #667085;
+  --xa-brand: #ff9900;
+}
+
+/* ===== Optional: helper class for showing dropdown ===== */
+.country-dropdown.is-open {
+  display: block;
+}
+
+.sa-password__toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: #667085;
+  border-radius: 8px;
+}
+
+.sa-password__toggle:hover {
+  background: #f6f7f9;
+}
+
+.sa-password__toggle i {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Container global pour donner un peu de contraste */
+.sa-auth {
+  background-color: #f5f6f8;
+  /* gris très clair pour faire ressortir la carte */
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 40px 15px;
+}
+
+/* La carte principale */
+.sa-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 460px;
+  border: 1px solid #e9ecef;
+
+  /* Ombre plus visible */
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12), 0 2px 6px rgba(0, 0, 0, 0.08);
+
+  /* petite animation subtile */
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.sa-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16), 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Header et body pour bien séparer */
+.sa-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #f1f1f1;
+  padding-bottom: 12px;
+}
+
+.sa-card__body {
+  padding-top: 10px;
+}
+
+/* Logo */
+.sa-logo img {
+  max-height: 50px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px #f9fafb, 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Titre */
+.sa-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1b1b1b;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* Responsive pour petits écrans */
+@media (max-width: 480px) {
+  .sa-card {
+    padding: 16px;
+    border-radius: 12px;
+    max-width: 100%;
+  }
+
+  .sa-title {
+    font-size: 1.1rem;
+    margin-bottom: 14px;
+  }
+
+  .sa-label {
+    font-size: 0.85rem;
+  }
+
+  .sa-input {
+    font-size: 0.9rem;
+    padding: 8px 10px;
+  }
+
+  .sa-password__toggle {
+    font-size: 0.9rem;
+    right: 6px;
+  }
+
+  .sa-btn {
+    font-size: 0.95rem;
+    padding: 10px 14px;
+    border-radius: 8px;
+  }
+
+  .sa-popup {
+    font-size: 0.9rem;
+    padding: 10px 12px;
+  }
+}
+
+/* === Inputs === */
+.sa-input {
+  width: 100%;
+  padding: 0.65rem 1rem;
+  border-radius: 24px;
+  border: 1px solid #d1d5db;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+  background-color: #ffffff; /* fond blanc */
+  color: #1c1c1c;
+}
+
+.sa-input:focus {
+  outline: none;
+  border-color: #ff9900;
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.2);
+}
+
+/* === Password container === */
+.sa-password {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.sa-password input.sa-input {
+  flex: 1;
+  border-radius: 24px;
+}
+
+/* toggle password */
+.sa-password__toggle {
+  position: absolute;
+  right: 0.8rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sa-password__toggle:hover {
+  color: #ff9900;
+}
+
+/* bouton principal Softadastra */
+.sa-btn--primary {
+  background-color: #ff9900;
+  color: #ffffff;
+  border-radius: 24px;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.sa-btn--primary:hover {
+  background-color: #e68a00;
+  box-shadow: 0 4px 8px rgba(255, 153, 0, 0.3);
+}

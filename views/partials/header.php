@@ -18,6 +18,7 @@
                 '/'        => 'Home',
                 '/docs'    => 'Docs',
                 '/users'   => 'Users',
+                '/auth'    => 'Auth',
                 '/market' => 'Market Example'
             ], ['class' => 'nav-links d-flex flex-column flex-md-row gap-3 my-2 my-md-0']) ?>
         </nav>

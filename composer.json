@@ -22,7 +22,8 @@
     "files": [
       "core/Support/Helpers.php",
       "support/ide-stubs.php",
-      "support/modules_autoload.php"
+      "support/modules_autoload.php",
+      "support/container.php"
     ]
   },
   "bin": [

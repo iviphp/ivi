@@ -1,0 +1,274 @@
+/* === Reset & Base === */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", sans-serif;
+}
+
+body {
+  background-color: #f9fafb;
+  color: #1c1c1c;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* === Auth Shell & Container === */
+.sa-auth {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 1rem;
+  min-height: 100vh;
+}
+
+.sa-card {
+  background-color: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* === Card Head === */
+.sa-card__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sa-back {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+  color: #3b82f6;
+  font-size: 0.9rem;
+  transition: color 0.2s;
+}
+.sa-back:hover {
+  color: #2563eb;
+}
+
+.sa-logo img {
+  height: 36px;
+  object-fit: contain;
+}
+
+/* === Card Body === */
+.sa-card__body {
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.sa-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.sa-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.sa-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  text-align: left;
+}
+
+.sa-label {
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.sa-input {
+  padding: 0.65rem 1rem;
+  border-radius: 24px;
+  border: 1px solid #d1d5db;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.sa-input:focus {
+  outline: none;
+  border-color: #ff9900;
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.2);
+}
+
+/* Password toggle */
+.sa-password {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sa-password__toggle {
+  position: absolute;
+  right: 0.8rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sa-password__toggle:hover {
+  color: #ff9900;
+}
+
+/* === Buttons === */
+.sa-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+
+.sa-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  border-radius: 24px; /* style Google-like */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.sa-btn svg {
+  flex-shrink: 0;
+}
+
+/* Primary button (Softadastra) */
+.sa-btn--primary {
+  background-color: #ff9900;
+  color: #fff;
+  font-weight: 600;
+}
+.sa-btn--primary:hover {
+  background-color: #e68a00;
+  box-shadow: 0 4px 8px rgba(255, 153, 0, 0.4);
+}
+
+/* Secondary button */
+.sa-btn--secondary {
+  background-color: #f3f4f6;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
+}
+.sa-btn--secondary:hover {
+  background-color: #e5e7eb;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Links */
+.sa-link {
+  font-size: 0.85rem;
+  color: #3b82f6;
+  text-decoration: underline;
+  margin-top: 0.5rem;
+  display: inline-block;
+}
+.sa-link:hover {
+  color: #2563eb;
+}
+
+/* Footer */
+.sa-footer {
+  margin-top: 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.sa-footer p {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+/* === Inputs === */
+.sa-input {
+  width: 100%; /* largeur complète */
+  padding: 0.65rem 1rem;
+  border-radius: 24px;
+  border: 1px solid #d1d5db;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+  background-color: #ffffff; /* fond blanc */
+  color: #1c1c1c;
+}
+
+.sa-input:focus {
+  outline: none;
+  border-color: #ff9900;
+  box-shadow: 0 0 0 3px rgba(255, 153, 0, 0.2);
+}
+
+/* === Password container === */
+.sa-password {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%; /* force la même largeur que email */
+}
+
+.sa-password input.sa-input {
+  flex: 1; /* occupe tout l’espace disponible */
+  border-radius: 24px;
+}
+
+.sa-password__toggle {
+  position: absolute;
+  right: 0.8rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sa-password__toggle:hover {
+  color: #ff9900;
+}
+
+/* === Responsive === */
+@media (max-width: 480px) {
+  .sa-card {
+    border-radius: 10px;
+  }
+  .sa-card__body {
+    padding: 1.5rem;
+  }
+  .sa-btn {
+    font-size: 0.9rem;
+    padding: 0.6rem 0.8rem;
+  }
+  .sa-input {
+    font-size: 0.9rem;
+    padding: 0.6rem 0.9rem;
+  }
+}

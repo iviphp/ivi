@@ -1,0 +1,529 @@
+a {
+  text-decoration: none;
+}
+
+body {
+  margin: 30px 0px 0px 0px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f2f2f2;
+  font-family: Arial, sans-serif;
+}
+
+/* Styles pour le lien de retour */
+.back-icon a {
+  display: inline-flex;
+  /* Utiliser un modèle flex pour aligner l'icône et le texte */
+  align-items: center;
+  /* Centrer verticalement l'icône et le texte */
+  font-size: 1rem;
+  /* Taille de la police pour le texte */
+  color: #007185;
+  /* Couleur bleu clair pour le texte */
+  text-decoration: none;
+  /* Enlever la décoration de texte par défaut */
+  font-weight: bold;
+  /* Mettre le texte en gras pour plus de visibilité */
+  padding: 8px 16px;
+  /* Un peu de padding autour du texte pour l'espace */
+  border-radius: 25px;
+  /* Coins arrondis */
+  background-color: #f2f2f2;
+  /* Fond gris clair pour l'élément */
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  /* Animation au survol */
+}
+
+/* Style pour l'icône */
+.back-icon a i {
+  margin-right: 8px;
+  /* Espacement entre l'icône et le texte */
+  font-size: 1.2rem;
+  /* Taille de l'icône */
+}
+
+/* Effet au survol */
+.back-icon a:hover {
+  background-color: #e6e6e6;
+  /* Fond légèrement plus sombre au survol */
+  transform: translateX(-5px);
+  /* Déplacer légèrement le lien vers la gauche */
+  color: #005a74;
+  /* Changer la couleur du texte au survol */
+}
+
+/* Effet au clic */
+.back-icon a:active {
+  background-color: #ccc;
+  /* Fond gris plus foncé quand l'utilisateur clique */
+  transform: translateX(-2px);
+  /* Réduire le mouvement de translation lors du clic */
+}
+
+/* Page de login */
+.login-page {
+  max-width: 500px;
+  width: 100%;
+  margin: 0 auto;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 0.1rem;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+  margin-top: 10px;
+  margin-bottom: 30px;
+}
+
+.login-page .form-group {
+  margin-bottom: 20px;
+}
+
+.login-page .form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.login-page .form-group .form-control {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  color: #333;
+  background-color: #fff;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.login-page .form-group .form-control:hover {
+  border-color: #ff9900;
+}
+
+.login-page .form-group .form-control:focus {
+  border-color: #ff9900;
+  box-shadow: 0 0 8px rgba(255, 153, 0, 0.4);
+  outline: none;
+}
+
+.login-page .form-group input[type="password"] {
+  font-family: "Arial", sans-serif;
+}
+
+.login-page .logo {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.login-page .logo img {
+  width: 10vw;
+  max-width: 95px;
+  height: auto;
+  border-radius: 50%;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+  border: 1px solid #ff9900;
+}
+
+.login-page .logo img:hover {
+  transform: scale(1.1);
+}
+
+.card-title {
+  font-size: 1.3rem;
+  color: #0f1111;
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.card-container-login {
+  max-width: 450px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 1rem;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.card-container-login p {
+  margin-bottom: 10px;
+}
+
+.custom-button-container-login {
+  width: 100%;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.custom-button-login {
+  width: 100%;
+  max-width: 450px;
+  padding: 12px 25px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border: 1px solid #ff9900;
+  border-radius: 30px;
+  background-color: #ff9900;
+  color: white;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.custom-button-login:hover {
+  background-color: #e68900;
+  border-color: #e68900;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+.custom-button-login:active {
+  background-color: #cc7a00;
+  border-color: #cc7a00;
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card-container-create {
+  width: 100%;
+  text-align: center;
+  padding: 0px 20px 30px;
+}
+
+.card-container-create p {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #0f1111;
+  margin-bottom: 0px;
+}
+
+.custom-button-create {
+  width: 100%;
+  max-width: 420px;
+  padding: 12px 25px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border: 1px solid #0f1111;
+  border-radius: 30px;
+  background-color: transparent;
+  color: #0f1111;
+  font-weight: bold;
+  transition: background-color 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.custom-button-create:hover {
+  background-color: transparent;
+  border-color: #009944;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+.custom-button-create:active {
+  background-color: transparent;
+  border-color: #008837;
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+@media only screen and (max-width: 600px) {
+  .login-page {
+    max-width: 400px;
+    margin-bottom: 10px;
+  }
+
+  .login-page .logo img {
+    max-width: 80px;
+    /* Réduit la taille de l'image sur les petits écrans */
+  }
+
+  .custom-button-login {
+    font-size: 1rem;
+    /* Taille de police réduite sur les petits écrans */
+    padding: 10px 20px;
+    /* Moins de padding pour les petits écrans */
+  }
+
+  .custom-button-create {
+    font-size: 1rem;
+    padding: 10px 20px;
+  }
+
+  .card-title {
+    font-size: 1.1rem;
+    /* Réduire légèrement la taille de la police */
+  }
+}
+
+.error-message {
+  color: #d9534f;
+  font-size: 16px;
+  padding: 15px;
+  border: 1px solid #d9534f;
+  border-radius: 4px;
+  background-color: #f8d7da;
+  margin-bottom: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  position: relative;
+}
+
+.error-message i {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.error-message p {
+  margin: 0;
+}
+
+.error-message a {
+  color: #007185;
+  text-decoration: underline;
+  font-weight: bold;
+  margin-top: 10px;
+  display: block;
+}
+
+.google-login-btn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 450px;
+  padding: 10px;
+  background-color: #007185;
+  color: white;
+  font-size: 1rem;
+  font-weight: bold;
+  border-radius: 30px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  text-align: center;
+  margin-left: 7px;
+}
+
+.google-login-btn i {
+  margin-right: 10px;
+}
+
+.google-login-btn:hover {
+  background-color: #357ae8;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+}
+
+.google-login-btn:active {
+  background-color: #2a66d1;
+  box-shadow: none;
+}
+
+.custom-button-container-login a {
+  display: block;
+  margin-top: 10px;
+  text-decoration: none;
+}
+
+.forgot-password {
+  display: inline-block;
+  padding: 6px 20px;
+  color: #ff0000;
+  font-size: 0.9rem;
+  font-weight: bold;
+  text-decoration: none;
+  border-radius: 5px;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+  margin-left: 8px;
+  margin-top: 20px;
+}
+
+.forgot-password:hover {
+  background-color: #ffcccc;
+  border-color: #ff0000;
+}
+
+.forgot-password:active {
+  background-color: #ffb3b3;
+}
+
+/* Stylisation de l'icône Google */
+.fa-google {
+  font-size: 1.5rem;
+  /* Taille de l'icône */
+  color: #4285f4;
+  /* Couleur bleue de Google */
+  margin-right: 10px;
+  /* Espacement à droite de l'icône */
+  transition: color 0.3s ease, transform 0.3s ease;
+  /* Animation lors du survol */
+}
+
+/* Effet au survol */
+.google-login-btn:hover .fa-google {
+  color: #34a853;
+  /* Couleur verte au survol */
+  transform: scale(1.1);
+  /* Agrandir l'icône légèrement au survol */
+}
+
+/* Effet au clic */
+.google-login-btn:active .fa-google {
+  color: #fbbc05;
+  /* Couleur jaune au clic */
+  transform: scale(1);
+  /* Réinitialiser l'agrandissement lors du clic */
+}
+
+@media only screen and (max-width: 600px) {
+  .google-login-btn {
+    margin-left: 0;
+  }
+}
+
+/* Icône de chargement */
+.spinner {
+  border: 8px solid #f3f3f3;
+  /* Couleur de fond grise claire */
+  border-top: 8px solid #ff9900;
+  /* Couleur de la barre en haut pour un effet dynamique */
+  border-radius: 50%;
+  /* Forme ronde */
+  width: 50px;
+  /* Largeur du spinner */
+  height: 50px;
+  /* Hauteur du spinner */
+  animation: spin 1.5s linear infinite;
+  /* Animation de rotation */
+  margin: 0 auto;
+  /* Centrer le spinner */
+}
+
+/* Animation de rotation */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Popup de notification */
+.popup-message {
+  position: fixed;
+  /* Fixer la popup à l'écran */
+  top: 50%;
+  /* Centrer verticalement */
+  left: 50%;
+  /* Centrer horizontalement */
+  transform: translate(-50%, -50%);
+  /* Ajuster pour centrer parfaitement */
+  background-color: #fff;
+  /* Fond blanc pour la popup */
+  border: 1px solid #ff9900;
+  /* Bordure orange */
+  padding: 20px;
+  /* Espacement interne */
+  border-radius: 10px;
+  /* Coins arrondis */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  /* Ombre légère */
+  width: 300px;
+  /* Largeur fixe de la popup */
+  text-align: center;
+  /* Centrer le texte */
+  display: none;
+  /* Cacher par défaut */
+  z-index: 9999;
+  /* Assurer que la popup est au-dessus des autres éléments */
+}
+
+/* Texte de la popup */
+.popup-message p {
+  font-size: 1rem;
+  color: #333;
+  /* Texte sombre */
+  margin: 0;
+}
+
+/* Effet de popup (apparition douce) */
+.popup-message.show {
+  animation: popupFadeIn 0.5s ease-out forwards;
+  /* Animation d'apparition */
+}
+
+/* Animation d'apparition de la popup */
+@keyframes popupFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+    /* Départ légèrement plus haut */
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    /* Position finale */
+  }
+}
+
+/* Style d'un bouton ou texte de fermeture dans la popup */
+.popup-message .close-btn {
+  margin-top: 10px;
+  padding: 8px 15px;
+  background-color: #ff9900;
+  color: white;
+  font-weight: bold;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.popup-message .close-btn:hover {
+  background-color: #e68900;
+}
+
+/* Responsivité pour les petits écrans */
+@media only screen and (max-width: 600px) {
+  .spinner {
+    width: 40px;
+    height: 40px;
+  }
+
+  .popup-message {
+    width: 250px;
+    /* Réduire la taille de la popup sur les petits écrans */
+  }
+}
+
+.custom-button-login {
+  width: 100%;
+  max-width: 450px;
+  padding: 12px 25px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  border: 1px solid #ff9900 !important;
+  border-radius: 30px;
+  background-color: #ff9900 !important;
+  color: #fff !important;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.login-page .form-group input {
+  padding: 8px;
+}

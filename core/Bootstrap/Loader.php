@@ -26,22 +26,11 @@ final class Loader
      */
     public static function bootstrap(string $baseDir): void
     {
-        // 1️⃣ Préparer .env
         self::prepareEnvFile($baseDir);
-
-        // 2️⃣ Charger le .env
         self::loadEnv($baseDir);
-
-        // 2b️⃣ Définir les constantes nécessaires aux fichiers config
         self::defineEarlyConstants();
-
-        // 3️⃣ Initialiser Config avec tous les fichiers config/*.php sauf routes.php
         self::initConfig($baseDir);
-
-        // 4️⃣ Définir les autres constantes globales
         self::defineConstants();
-
-        // 5️⃣ Configurer Cloudinary si présent
         self::configureCloudinary();
     }
 
