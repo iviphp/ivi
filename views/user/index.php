@@ -1,49 +1,18 @@
-<?php
-
-/** @var \Ivi\Core\ORM\Pagination $page */ ?>
 <h1>Users</h1>
-<p>
-    <a href="/users/create">+ New user</a>
-</p>
-<table border="1" cellpadding="6" cellspacing="0">
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Active</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        <?php foreach ($page->items as $u): $arr = $u->toArray(); ?>
-            <tr>
-                <td><?= (int)($arr['id'] ?? 0) ?></td>
-                <td><?= htmlspecialchars((string)($arr['name'] ?? ''), ENT_QUOTES) ?></td>
-                <td><?= htmlspecialchars((string)($arr['email'] ?? ''), ENT_QUOTES) ?></td>
-                <td><?= !empty($arr['active']) ? 'yes' : 'no' ?></td>
-                <td>
-                    <a href="/users/<?= (int)$arr['id'] ?>">show</a>
-                    <a href="/users/<?= (int)$arr['id'] ?>/edit">edit</a>
-                    <form action="/users/<?= (int)$arr['id'] ?>/delete" method="post" style="display:inline" onsubmit="return confirm('Delete user?');">
-                        <button type="submit">delete</button>
-                    </form>
-                </td>
-            </tr>
-        <?php endforeach; ?>
-    </tbody>
-</table>
 
 <p>
-    Total: <?= $page->total ?> — Page <?= $page->currentPage ?> / <?= $page->lastPage ?>
+    <a class="btn btn-primary btn-sm" data-spa href="/users/create">+ New user</a>
 </p>
-<nav>
-    <?php if ($page->hasPrev()): ?>
-        <a href="?page=1&per_page=<?= $page->perPage ?>">« First</a>
-        <a href="?page=<?= $page->prevPage() ?>&per_page=<?= $page->perPage ?>">‹ Prev</a>
-    <?php endif; ?>
-    <?php if ($page->hasNext()): ?>
-        <a href="?page=<?= $page->nextPage() ?>&per_page=<?= $page->perPage ?>">Next ›</a>
-        <a href="?page=<?= $page->lastPage ?>&per_page=<?= $page->perPage ?>">Last »</a>
-    <?php endif; ?>
-</nav>
+
+<div class="alert alert-danger d-none" role="alert" id="users-index-global-error"></div>
+
+<div id="users-index-shell">
+    <div class="text-muted">Loading users…</div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mt-3">
+    <div class="text-muted small" id="users-index-meta"></div>
+    <nav>
+        <ul class="pagination pagination-sm mb-0" id="users-index-pagination"></ul>
+    </nav>
+</div>

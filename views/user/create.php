@@ -1,70 +1,42 @@
-<?php
-
-/** @var \Ivi\Validation\ErrorBag|null $errors */
-/** @var array<string,mixed>|null $old */
-$old = $old ?? [];
-$errors = $errors ?? null;
-
-$firstError = function (string $field) use ($errors): ?string {
-    return $errors ? $errors->first($field) : null;
-};
-?>
 <h1>New user</h1>
 
-<?php if ($errors && !$errors->isEmpty()): ?>
-    <div style="background:#fee;border:1px solid #f99;padding:10px;margin:10px 0;">
-        <strong>There were some problems with your input:</strong>
-        <ul style="margin:8px 0 0 16px;">
-            <?php foreach ($errors->all() as $field => $messages): ?>
-                <?php foreach ($messages as $m): ?>
-                    <li><?= htmlspecialchars("{$field}: {$m}", ENT_QUOTES) ?></li>
-                <?php endforeach; ?>
-            <?php endforeach; ?>
-        </ul>
-    </div>
-<?php endif; ?>
+<!-- Zone message globale (optionnel) -->
+<div class="alert alert-danger d-none" role="alert" id="user-create-global-error"></div>
 
-<form action="/users" method="post" novalidate>
-    <div style="margin-bottom:10px;">
-        <label>Name</label><br>
-        <input
-            type="text" name="name"
-            value="<?= htmlspecialchars((string)($old['name'] ?? ''), ENT_QUOTES) ?>"
-            required>
-        <?php if ($e = $firstError('name')): ?>
-            <div style="color:#c00;font-size:0.9em;"><?= htmlspecialchars($e, ENT_QUOTES) ?></div>
-        <?php endif; ?>
+<form
+    data-spa-form
+    action="/api/users"
+    method="post"
+    data-spa-disable="true"
+    data-spa-reset="false"
+    novalidate>
+
+    <div class="mb-3">
+        <label class="form-label">Name</label>
+        <input class="form-control" type="text" name="name" required>
+        <div class="invalid-feedback" data-err="name"></div>
     </div>
 
-    <div style="margin-bottom:10px;">
-        <label>Email</label><br>
-        <input
-            type="email" name="email"
-            value="<?= htmlspecialchars((string)($old['email'] ?? ''), ENT_QUOTES) ?>"
-            required>
-        <?php if ($e = $firstError('email')): ?>
-            <div style="color:#c00;font-size:0.9em;"><?= htmlspecialchars($e, ENT_QUOTES) ?></div>
-        <?php endif; ?>
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input class="form-control" type="email" name="email" required>
+        <div class="invalid-feedback" data-err="email"></div>
     </div>
 
-    <div style="margin-bottom:10px;">
-        <label>Password</label><br>
-        <input type="password" name="password" required>
-        <?php if ($e = $firstError('password')): ?>
-            <div style="color:#c00;font-size:0.9em;"><?= htmlspecialchars($e, ENT_QUOTES) ?></div>
-        <?php endif; ?>
+    <div class="mb-3">
+        <label class="form-label">Password</label>
+        <input class="form-control" type="password" name="password" required>
+        <div class="invalid-feedback" data-err="password"></div>
     </div>
 
-    <div style="margin-bottom:14px;">
-        <label>
-            <input type="checkbox" name="active" value="1"
-                <?= array_key_exists('active', $old ?? []) ? 'checked' : '' ?>> Active
-        </label>
-        <?php if ($e = $firstError('active')): ?>
-            <div style="color:#c00;font-size:0.9em;"><?= htmlspecialchars($e, ENT_QUOTES) ?></div>
-        <?php endif; ?>
+    <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" name="active" value="1" id="activeCheck">
+        <label class="form-check-label" for="activeCheck">Active</label>
+        <div class="invalid-feedback d-block" data-err="active"></div>
     </div>
 
-    <button type="submit">Create</button>
-    <a href="/users">Cancel</a>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">Create</button>
+        <a class="btn btn-outline-secondary" data-spa href="/users">Cancel</a>
+    </div>
 </form>
