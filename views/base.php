@@ -38,7 +38,7 @@
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 </head>
 
-<body class="bg-light text-dark font-sans">
+<body class="font-sans">
 
     <?php include base_path('views/partials/header.php'); ?>
 

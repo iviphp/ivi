@@ -50,3 +50,12 @@ if (file_exists($dotenvPath . '.env.testing')) {
 
 // Default environment variable for testing context
 $_ENV['APP_ENV'] = $_ENV['APP_ENV'] ?? 'testing';
+$basePath = realpath(__DIR__ . '/..');
+if ($basePath === false) {
+    throw new RuntimeException('Cannot resolve project base path');
+}
+
+if (!defined('BASE_PATH')) {
+    define('BASE_PATH', $basePath);
+}
+$_ENV['BASE_PATH'] = $_ENV['BASE_PATH'] ?? $basePath;

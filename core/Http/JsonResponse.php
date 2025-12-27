@@ -43,4 +43,21 @@ final class JsonResponse extends Response
         $this->depth = $depth;
         return $this;
     }
+
+    /**
+     * Decode the JSON response content into an array.
+     * Used by tests and internal consumers.
+     */
+    public function getData(bool $assoc = true): array
+    {
+        $json = $this->content();
+
+        if ($json === '') {
+            return [];
+        }
+
+        $decoded = json_decode($json, $assoc);
+
+        return is_array($decoded) ? $decoded : [];
+    }
 }

@@ -46,7 +46,7 @@ use Ivi\Http\Request;
  * @see \Ivi\Http\Exceptions\MethodNotAllowedHttpException
  * @since 1.0.0
  */
-final class Router
+class Router
 {
     /** @var array<string, Route[]> */
     private array $routes = [

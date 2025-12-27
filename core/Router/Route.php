@@ -55,7 +55,7 @@ use Ivi\Core\Debug\Callsite;
  * @see \Ivi\Core\Debug\Callsite
  * @since 1.0.0
  */
-final class Route
+class Route
 {
     /** @var string HTTP path pattern ex: "users/:id" */
     private string $path;
