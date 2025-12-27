@@ -127,37 +127,58 @@ abstract class Controller
             throw new ViewNotFoundException($filePath);
         }
 
-        // Capture HTML fragment content
+        $params = $params ?? [];
+
+        // Render view content (fragment)
         $content = $this->capture(function () use ($filePath, $params) {
             if (is_array($params)) extract($params, EXTR_SKIP);
             require $filePath;
         });
 
         $isAjax = $this->isAjax($request);
-        $isSPA  = ($params['spa'] ?? false);
 
-        /**
-         * 🚀 CASE 1: SPA + AJAX = return the fragment + title header
-         */
+        // IMPORTANT:
+        // If it's an AJAX navigation, we MUST return fragment + headers
+        // even if 'spa' flag was not manually set.
+        $isSPA = (bool)($params['spa'] ?? false);
+        if ($isAjax) {
+            $isSPA = true;
+        }
+
         if ($isSPA && $isAjax) {
-            $pageTitle = self::$layoutVars['title']
-                ?? ($params['title'] ?? 'Softadastra');
+            $pageTitle = (string)(self::$layoutVars['title'] ?? ($params['title'] ?? 'Softadastra'));
+            $pageId    = (string)($params['page_id'] ?? $path);
 
             $response = new HtmlResponse($content, $status);
-            $response->header('X-Page-Title', $pageTitle);
 
-            // 🔥 Ajout scripts SPA
-            if (!empty($params['spa_scripts'])) {
-                // spa_scripts = liste d’URL, pas de balises <script>
-                $response->header('X-Page-Scripts', json_encode($params['spa_scripts']));
+            // Required SPA headers
+            $response->header('X-Page-Title', $pageTitle);
+            $response->header('X-Page-Id', $pageId);
+
+            // Optional assets: { js:[], css:[] }
+            $scripts = $params['spa_scripts'] ?? [];
+            $styles  = $params['spa_styles'] ?? [];
+
+            if (!empty($scripts) || !empty($styles)) {
+                $response->header(
+                    'X-Page-Assets',
+                    json_encode(
+                        [
+                            'js'  => array_values((array)$scripts),
+                            'css' => array_values((array)$styles),
+                        ],
+                        JSON_UNESCAPED_SLASHES
+                    )
+                );
             }
+
+            // Nice for dev (avoid weird caching)
+            $response->header('Cache-Control', 'no-store, no-cache, must-revalidate');
 
             return $response;
         }
 
-        /**
-         * 🚀 CASE 2: Normal page = wrap with the full layout
-         */
+        // Normal full page rendering (layout)
         $layout = $layoutOverride ?? $this->layout;
         $layoutPath = $this->viewsBasePath() . $layout;
 
@@ -165,27 +186,24 @@ abstract class Controller
             return new HtmlResponse($content, $status);
         }
 
-        // Generate / ensure CSRF token for the layout (available in the view)
-        // Do not force regeneration here (false) to avoid unnecessary invalidation of tokens.
         $__csrf_token = \Ivi\Core\Security\Csrf::generateToken(false);
 
-        // Capture the full layout — pass $__csrf_token into the closure via use
         $full = $this->capture(function () use ($layoutPath, $content, $params, $__csrf_token) {
-            // Inject layout variables and params
             $title = self::$layoutVars['title'] ?? ($params['title'] ?? 'Softadastra');
 
             if (!empty(self::$layoutVars)) extract(self::$layoutVars, EXTR_OVERWRITE);
             if (is_array($params)) extract($params, EXTR_OVERWRITE);
 
-            // SPA flag for global JS (spa.js)
+            // NOTE: you don't need this line normally; layout already sets __SPA__.
+            // Keeping it is OK but it's redundant.
             echo '<script>window.__SPA__ = true;</script>';
 
-            // The view/layout can now safely access $__csrf_token
             require $layoutPath;
         });
 
         return new HtmlResponse($full, $status);
     }
+
 
     /**
      * Shortcut for rendering a view using the default layout.
@@ -207,7 +225,6 @@ abstract class Controller
         int $status = 200
     ): HtmlResponse {
 
-        // Active automatiquement le mode SPA pour les requêtes AJAX
         if ($request && $this->isAjax($request)) {
             $params = $params ?? [];
             $params['spa'] = true;
@@ -228,37 +245,25 @@ abstract class Controller
         return $this;
     }
 
-    // --------------------------------------------------------------------
-    // Response Helpers
-    // --------------------------------------------------------------------
-
-    /** Return a raw HTML response. */
     protected function html(string $html, int $status = 200): HtmlResponse
     {
         return new HtmlResponse($html, $status);
     }
 
-    /** Return a JSON response. */
     protected function json(mixed $data, int $status = 200): JsonResponse
     {
         return new JsonResponse($data, $status);
     }
 
-    /** Return a plain-text response. */
     protected function text(string $text, int $status = 200): TextResponse
     {
         return new TextResponse($text, $status);
     }
 
-    /** Return an HTTP redirect response. */
     protected function redirect(string $url, int $status = 302): RedirectResponse
     {
         return new RedirectResponse($url, $status);
     }
-
-    // --------------------------------------------------------------------
-    // Internal Utilities
-    // --------------------------------------------------------------------
 
     /**
      * Detect whether the current request was made via AJAX or expects JSON.
@@ -324,16 +329,13 @@ abstract class Controller
         return $out ?: '';
     }
 
-    /** Enregistre un namespace de vues, ex: Controller::addViewNamespace('market', '/abs/path/to/views') */
     public static function addViewNamespace(string $ns, string $path): void
     {
         self::$viewNamespaces[$ns] = rtrim($path, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
     }
 
-    /** Résout un chemin de vue, supporte "ns::path.to.view" et "path.to.view" */
     protected function resolveViewPath(string $path): array
     {
-        // Syntaxe "market::home"
         if (strpos($path, '::') !== false) {
             [$ns, $rel] = explode('::', $path, 2);
             if (isset(self::$viewNamespaces[$ns])) {
@@ -343,20 +345,17 @@ abstract class Controller
             }
         }
 
-        // Syntaxe standard "pages.home"
         $base = $this->viewsBasePath();
         $file = $this->dotToPath($path) . '.php';
         return [$base, $file];
     }
 
-    /** Comme resolveViewPath() mais pour les layouts (accepte aussi "ns::layout.php") */
     protected function resolveLayoutPath(string $layout): array
     {
         if (strpos($layout, '::') !== false) {
             [$ns, $rel] = explode('::', $layout, 2);
             if (isset(self::$viewNamespaces[$ns])) {
                 $base = self::$viewNamespaces[$ns];
-                // on autorise soit "layouts/main", soit "layouts/main.php"
                 $rel = str_ends_with($rel, '.php') ? $rel : ($rel . '.php');
                 $file = str_replace('.', DIRECTORY_SEPARATOR, $rel);
                 return [$base, $file];
@@ -364,7 +363,7 @@ abstract class Controller
         }
 
         $base = $this->viewsBasePath();
-        $file = $layout; // déjà un chemin relatif style "base.php" ou "layouts/main.php"
+        $file = $layout;
         return [$base, $file];
     }
 }

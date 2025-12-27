@@ -3,6 +3,7 @@
 use App\Controllers\Docs\DocsController;
 use App\Controllers\Home\HomeController;
 use App\Controllers\User\UserController;
+use App\Controllers\User\UserApiController;
 use Ivi\Core\View\View;
 use Ivi\Http\JsonResponse;
 use Ivi\Http\Request;
@@ -76,3 +77,29 @@ $router->any('/__alive', function (Request $req) {
         'seen_path'   => $req->path(),
     ]);
 });
+
+/* --------------------
+ * API – Users
+ * -------------------- */
+
+// index: GET /api/users?page=&per_page=
+$router->get('/api/users', [UserApiController::class, 'index']);
+
+// show: GET /api/users/:id
+$router->get('/api/users/:id', [UserApiController::class, 'show'])
+    ->where('id', '\d+');
+
+// store: POST /api/users
+$router->post('/api/users', [UserApiController::class, 'store']);
+
+// update: PATCH /api/users/:id
+$router->patch('/api/users/:id', [UserApiController::class, 'update'])
+    ->where('id', '\d+');
+
+// fallback update (POST + _method=PATCH)
+$router->post('/api/users/:id', [UserApiController::class, 'update'])
+    ->where('id', '\d+');
+
+// delete: DELETE /api/users/:id
+$router->delete('/api/users/:id', [UserApiController::class, 'destroy'])
+    ->where('id', '\d+');

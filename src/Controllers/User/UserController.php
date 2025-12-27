@@ -88,19 +88,23 @@ final class UserController extends Controller
 
         return $this->view('user.index', [
             'title' => 'Users title',
-            'page' => $pageDto
+            'page' => $pageDto,
+            'page_id' => 'user.index',
+            'scripts' => ['assets/js/pages/user-index.js'],
         ]);
     }
 
     /** Show details of a specific user by ID. */
-    public function show(int $id): HtmlResponse
+    public function show(Request $request, int $id): HtmlResponse
     {
         $user = User::find($id);
         if (!$user) throw new NotFoundHttpException('User not found.');
 
         return $this->view('user.show', [
             'title' => "Show " . $user->toArray()['name'],
-            'user' => $user
+            'user' => $user,
+            'page_id' => 'user.show',
+            'spa_scripts' => [asset('assets/js/pages/user-show.js')],
         ]);
     }
 
@@ -108,7 +112,9 @@ final class UserController extends Controller
     public function create(): HtmlResponse
     {
         return $this->view('user.create', [
-            'title' => 'Create User'
+            'title' => 'Create User',
+            'page_id' => 'user.create',
+            'scripts' => ['assets/js/pages/user-create.js'],
         ]);
     }
 
@@ -151,7 +157,9 @@ final class UserController extends Controller
         if (!$user) throw new NotFoundHttpException('User not found.');
         return $this->view('user.edit', [
             'title' => 'Edit ' . $user->toArray()['name'],
-            'user' => $user
+            'user' => $user,
+            'page_id' => 'user.edit',
+            'scripts' => ['assets/js/pages/user-edit.js'],
         ]);
     }
 

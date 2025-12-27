@@ -518,32 +518,45 @@ if (!function_exists('active_class')) {
 
 if (!function_exists('spa_link')) {
     /**
-     * Generates a SPA-ready anchor link (<a>).
+     * Generate a SPA-ready <a> link.
      *
-     * Internal links automatically get `data-spa` attribute for AJAX navigation.
-     * External links (absolute URLs, different domain) are left unchanged.
+     * - Internal links → data-spa="true"
+     * - External / protocol links → normal navigation
      *
-     * @param string $href The link URL
-     * @param string $label The visible text of the link
-     * @param array $attrs Additional HTML attributes (e.g., 'class', 'id')
-     * @return string HTML anchor tag
+     * @param string $href
+     * @param string $label
+     * @param array  $attrs
+     * @return string
      */
     function spa_link(string $href, string $label, array $attrs = []): string
     {
-        // Detect external link
-        $parsed = parse_url($href);
-        $isExternal = isset($parsed['host'])
-            || str_starts_with($href, 'http')
-            || str_starts_with($href, '//');
+        $href = trim($href);
 
-        // Internal link: add SPA attribute
+        // Detect protocol / external links
+        $isExternal = false;
+
+        // mailto:, tel:, javascript:
+        if (preg_match('#^(mailto:|tel:|javascript:)#i', $href)) {
+            $isExternal = true;
+        } else {
+            $parsed = parse_url($href);
+            if (
+                isset($parsed['scheme']) ||
+                isset($parsed['host']) ||
+                str_starts_with($href, '//')
+            ) {
+                $isExternal = true;
+            }
+        }
+
+        // Internal link → enable SPA
         if (!$isExternal) {
             $attrs['data-spa'] = 'true';
 
-            // Ensure class attribute exists
-            if (!isset($attrs['class'])) {
+            // Default class
+            if (empty($attrs['class'])) {
                 $attrs['class'] = 'nav-link';
-            } else {
+            } elseif (!str_contains($attrs['class'], 'nav-link')) {
                 $attrs['class'] .= ' nav-link';
             }
         }
@@ -551,17 +564,19 @@ if (!function_exists('spa_link')) {
         // Build attributes
         $attrString = '';
         foreach ($attrs as $k => $v) {
-            $attrString .= sprintf(' %s="%s"', htmlspecialchars($k), htmlspecialchars((string)$v));
+            if ($v === true) $v = 'true';
+            $attrString .= ' ' . e((string)$k) . '="' . e((string)$v) . '"';
         }
 
         return sprintf(
             '<a href="%s"%s>%s</a>',
-            htmlspecialchars($href),
+            e($href),
             $attrString,
-            htmlspecialchars($label)
+            e($label)
         );
     }
 }
+
 
 if (!function_exists('menu')) {
     /**
@@ -582,13 +597,18 @@ if (!function_exists('menu')) {
     function menu(array $items, array $attrs = [], bool $useList = false): string
     {
         $attrString = '';
-        foreach ($attrs as $k => $v) $attrString .= sprintf(' %s="%s"', htmlspecialchars($k), htmlspecialchars((string)$v));
+        foreach ($attrs as $k => $v) {
+            $attrString .= sprintf(' %s="%s"', e((string)$k), e((string)$v));
+        }
 
         $html = $useList ? "<ul{$attrString}>" : "<nav{$attrString}>";
+
         foreach ($items as $href => $label) {
-            $linkAttrs = ['data-spa' => true];
-            $html .= $useList ? "<li>" . spa_link($href, $label, $linkAttrs) . "</li>" : spa_link($href, $label, $linkAttrs);
+            // IMPORTANT: ne force pas data-spa ici
+            $link = spa_link($href, $label, ['class' => 'nav-link ' . active_class($href)]);
+            $html .= $useList ? "<li>{$link}</li>" : $link;
         }
+
         $html .= $useList ? '</ul>' : '</nav>';
         return $html;
     }
@@ -695,5 +715,99 @@ if (!function_exists('log_error')) {
     function log_error(mixed $value, ?string $label = null): void
     {
         log_msg($value, $label, 'error');
+    }
+}
+
+if (!function_exists('css')) {
+    /**
+     * Return a <link rel="stylesheet"> tag for a public asset.
+     *
+     * Example: css('assets/css/users.css')
+     */
+    function css(string $path, array $attrs = []): string
+    {
+        $href = asset($path, true);
+        $attrs = array_merge([
+            'rel'  => 'stylesheet',
+            'href' => $href,
+        ], $attrs);
+
+        $s = '';
+        foreach ($attrs as $k => $v) {
+            $s .= ' ' . e((string)$k) . '="' . e((string)$v) . '"';
+        }
+        return '<link' . $s . '>';
+    }
+}
+
+if (!function_exists('js')) {
+    /**
+     * Return a <script> tag for a public asset.
+     *
+     * Example: js('assets/js/pages/user-index.js')
+     */
+    function js(string $path, array $attrs = []): string
+    {
+        $src = asset($path, true);
+        $attrs = array_merge([
+            'src'   => $src,
+            'defer' => 'defer',
+        ], $attrs);
+
+        $s = '';
+        foreach ($attrs as $k => $v) {
+            if ($v === true) $v = $k; // allow boolean attrs
+            $s .= ' ' . e((string)$k) . '="' . e((string)$v) . '"';
+        }
+        return '<script' . $s . '></script>';
+    }
+}
+
+if (!function_exists('spa_page')) {
+    /**
+     * Helper to standardize SPA params:
+     * - page_id => <main data-page="...">
+     * - scripts/styles => injected in layout
+     *
+     * Example:
+     *   return $this->view('user.index', spa_page('user.index', [
+     *      'title' => 'Users',
+     *      'page'  => $pageDto,
+     *      'scripts' => [ 'assets/js/pages/user-index.js' ],
+     *      'styles'  => [ 'assets/css/user.css' ],
+     *   ]), $request);
+     */
+    function spa_page(string $pageId, array $params = []): array
+    {
+        $styles  = $params['styles']  ?? [];
+        $scripts = $params['scripts'] ?? [];
+
+        // normalize
+        if (is_string($styles))  $styles = [$styles];
+        if (is_string($scripts)) $scripts = [$scripts];
+
+        // if user already passed raw html tags (rare), keep it
+        $stylesHtml  = is_string($params['styles']  ?? null) ? (string)$params['styles']  : '';
+        $scriptsHtml = is_string($params['scripts'] ?? null) ? (string)$params['scripts'] : '';
+
+        // build tags from arrays
+        if (is_array($styles)) {
+            foreach ($styles as $p) {
+                if ($p) $stylesHtml .= css((string)$p) . "\n";
+            }
+        }
+
+        if (is_array($scripts)) {
+            foreach ($scripts as $p) {
+                if ($p) $scriptsHtml .= js((string)$p) . "\n";
+            }
+        }
+
+        // final values used by layout
+        $params['styles']  = $stylesHtml;
+        $params['scripts'] = $scriptsHtml;
+        $params['page_id'] = $pageId;
+
+        return $params;
     }
 }

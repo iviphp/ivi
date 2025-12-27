@@ -11,3 +11,6 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener("scroll", onScroll, { passive: true });
   }
 });
+document.addEventListener("spa:page:init", (e) => {
+  console.log("[spa:page:init]", e.detail);
+});
